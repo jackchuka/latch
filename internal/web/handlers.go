@@ -1,0 +1,155 @@
+package web
+
+import (
+	"fmt"
+	"net/http"
+	"sort"
+
+	"github.com/jackchuka/latch/internal/detach"
+	"github.com/jackchuka/latch/internal/queue"
+)
+
+type indexData struct {
+	Items []*queue.Item
+	Flash string
+	Error string
+}
+
+type showData struct {
+	Item  *queue.Item
+	Flash string
+	Error string
+}
+
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	items, err := s.queue.ListAll()
+	if err != nil {
+		s.renderError(w, r, "Failed to list queue: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sortItems(items)
+
+	data := indexData{
+		Items: items,
+		Flash: r.URL.Query().Get("flash"),
+		Error: r.URL.Query().Get("error"),
+	}
+	if err := s.index.ExecuteTemplate(w, "index.html", data); err != nil {
+		s.logger.Printf("template error: %v", err)
+	}
+}
+
+func (s *Server) handleQueuePartial(w http.ResponseWriter, r *http.Request) {
+	items, err := s.queue.ListAll()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sortItems(items)
+
+	if err := s.partial.ExecuteTemplate(w, "queue_rows", items); err != nil {
+		s.logger.Printf("template error: %v", err)
+	}
+}
+
+func (s *Server) handleShow(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	item, err := s.queue.Load(id)
+	if err != nil {
+		s.renderError(w, r, "Item not found: "+id, http.StatusNotFound)
+		return
+	}
+
+	data := showData{
+		Item:  item,
+		Flash: r.URL.Query().Get("flash"),
+		Error: r.URL.Query().Get("error"),
+	}
+	if err := s.show.ExecuteTemplate(w, "show.html", data); err != nil {
+		s.logger.Printf("template error: %v", err)
+	}
+}
+
+func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	pid, err := detach.Approve(s.queue, id)
+	if err != nil {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, err.Error()))
+		return
+	}
+	s.redirect(w, r, fmt.Sprintf("/queue/%s?flash=Approved+%%28pid+%d%%29", id, pid))
+}
+
+func (s *Server) handleReject(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	item, err := s.queue.Load(id)
+	if err != nil {
+		s.redirect(w, r, "/?error=Item+not+found")
+		return
+	}
+	if item.Status != queue.StatusPending {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=Item+is+not+pending", id))
+		return
+	}
+
+	if err := s.queue.Delete(id); err != nil {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, err.Error()))
+		return
+	}
+	s.redirect(w, r, "/?flash=Rejected+"+id)
+}
+
+func (s *Server) handleClear(w http.ResponseWriter, r *http.Request) {
+	n, err := s.queue.DeleteByStatus(queue.StatusDone)
+	if err != nil {
+		s.redirect(w, r, "/?error="+err.Error())
+		return
+	}
+	s.redirect(w, r, fmt.Sprintf("/?flash=Cleared+%d+done+items", n))
+}
+
+func (s *Server) handleClearAll(w http.ResponseWriter, r *http.Request) {
+	n, err := s.queue.DeleteByStatus(queue.StatusPending, queue.StatusRunning, queue.StatusDone, queue.StatusFailed)
+	if err != nil {
+		s.redirect(w, r, "/?error="+err.Error())
+		return
+	}
+	s.redirect(w, r, fmt.Sprintf("/?flash=Cleared+%d+items", n))
+}
+
+// redirect sends a POST-redirect-GET response, or sets HX-Redirect for htmx requests.
+func (s *Server) redirect(w http.ResponseWriter, r *http.Request, target string) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", target)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
+func (s *Server) renderError(w http.ResponseWriter, _ *http.Request, msg string, code int) {
+	w.WriteHeader(code)
+	data := indexData{Error: msg}
+	if err := s.index.ExecuteTemplate(w, "index.html", data); err != nil {
+		s.logger.Printf("template error: %v", err)
+		http.Error(w, msg, code)
+	}
+}
+
+// sortItems orders items: pending first, then running, then by created descending.
+func sortItems(items []*queue.Item) {
+	statusOrder := map[string]int{
+		queue.StatusPending: 0,
+		queue.StatusRunning: 1,
+		queue.StatusFailed:  2,
+		queue.StatusDone:    3,
+	}
+	sort.Slice(items, func(i, j int) bool {
+		oi, oj := statusOrder[items[i].Status], statusOrder[items[j].Status]
+		if oi != oj {
+			return oi < oj
+		}
+		return items[i].Created.After(items[j].Created)
+	})
+}

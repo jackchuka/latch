@@ -1,0 +1,24 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<h2 style="margin: 1rem 0 0.5rem;">Queue</h2>
+<div class="actions">
+  <form method="POST" action="/queue/clear"><button class="btn btn-outline btn-sm" type="submit">Clear done</button></form>
+  <form method="POST" action="/queue/clear-all"><button class="btn btn-outline btn-sm" type="submit">Clear all</button></form>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Task</th>
+      <th>Status</th>
+      <th>Created</th>
+      <th>Paused Step</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody hx-get="/partials/queue" hx-trigger="every 5s" hx-swap="innerHTML">
+    {{template "queue_rows" .Items}}
+  </tbody>
+</table>
+{{end}}

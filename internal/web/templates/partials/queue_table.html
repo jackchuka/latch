@@ -1,0 +1,25 @@
+{{define "queue_rows"}}
+{{- if not .}}
+<tr><td colspan="6" class="empty">No items in the queue.</td></tr>
+{{- else}}
+{{- range .}}
+<tr>
+  <td><a href="/queue/{{.ID}}">{{.ID}}</a></td>
+  <td>{{.Task}}</td>
+  <td><span class="badge badge-{{statusClass .Status}}">{{.Status}}</span></td>
+  <td>{{formatTime .Created}}</td>
+  <td>{{.PausedAtStep}}</td>
+  <td>
+    {{- if eq .Status "pending"}}
+    <form method="POST" action="/queue/{{.ID}}/approve" style="display:inline;">
+      <button class="btn btn-primary btn-sm" type="submit">Approve</button>
+    </form>
+    <form method="POST" action="/queue/{{.ID}}/reject" style="display:inline;">
+      <button class="btn btn-danger btn-sm" type="submit">Reject</button>
+    </form>
+    {{- end}}
+  </td>
+</tr>
+{{- end}}
+{{- end}}
+{{end}}

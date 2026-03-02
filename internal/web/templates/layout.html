@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Latch Dashboard</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #fff;
+      --border: #dee2e6;
+      --text: #212529;
+      --text-muted: #6c757d;
+      --primary: #0d6efd;
+      --danger: #dc3545;
+      --success: #198754;
+      --warning: #fd7e14;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 1rem; }
+    nav { background: var(--text); color: #fff; padding: 0.75rem 1rem; }
+    nav a { color: #fff; font-weight: 600; font-size: 1.1rem; }
+    nav a:hover { text-decoration: none; opacity: 0.9; }
+
+    .flash { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    .flash-success { background: #d1e7dd; color: #0f5132; }
+    .flash-error { background: #f8d7da; color: #842029; }
+
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    th, td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); }
+    td { font-size: 0.9rem; }
+
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; }
+    .badge-pending { background: #fff3cd; color: #664d03; }
+    .badge-running { background: #cff4fc; color: #055160; }
+    .badge-done { background: #d1e7dd; color: #0f5132; }
+    .badge-failed { background: #f8d7da; color: #842029; }
+
+    .btn { display: inline-block; padding: 0.35rem 0.75rem; border: none; border-radius: 5px; font-size: 0.85rem; font-weight: 500; cursor: pointer; text-decoration: none; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #0b5ed7; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #bb2d3b; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--bg); }
+    .btn-sm { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+
+    .actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .card { background: var(--surface); border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1rem; }
+    .meta { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; font-size: 0.9rem; margin-bottom: 1rem; }
+    .meta dt { font-weight: 600; color: var(--text-muted); }
+    details { margin-bottom: 0.5rem; }
+    summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; }
+    pre { background: var(--bg); padding: 0.75rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
+    .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <nav><div class="container"><a href="/">Latch Dashboard</a></div></nav>
+  <div class="container">
+    {{- if .Flash}}
+    <div class="flash flash-success">{{.Flash}}</div>
+    {{- end}}
+    {{- if .Error}}
+    <div class="flash flash-error">{{.Error}}</div>
+    {{- end}}
+    {{template "content" .}}
+  </div>
+</body>
+</html>

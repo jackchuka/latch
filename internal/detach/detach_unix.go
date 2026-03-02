@@ -1,6 +1,6 @@
 //go:build unix
 
-package queuecmd
+package detach
 
 import "syscall"
 
