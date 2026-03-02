@@ -1,0 +1,17 @@
+name: my-task
+timeout: 300 # optional, seconds
+schedule: "0 9 * * 1-5" # optional, cron expression
+
+steps:
+  - name: step_one
+    command: echo
+    args: ["hello"]
+
+  - name: step_two
+    command: bash
+    args: ["-c", "echo got: {{.step_one.output}}"]
+
+  - name: step_three
+    command: bash
+    args: ["-c", "echo final: {{.step_two.output}}"]
+    approve: true # require approval before running this step
