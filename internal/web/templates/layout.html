@@ -59,6 +59,29 @@
     summary { cursor: pointer; font-weight: 600; padding: 0.4rem 0; }
     pre { background: var(--bg); padding: 0.75rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
     .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1b1e;
+        --surface: #25262b;
+        --border: #373a40;
+        --text: #c1c2c5;
+        --text-muted: #909296;
+        --primary: #4dabf7;
+        --danger: #ff6b6b;
+        --success: #51cf66;
+        --warning: #ffc078;
+      }
+      nav { background: #101113; }
+      .flash-success { background: #0f5132; color: #d1e7dd; }
+      .flash-error { background: #842029; color: #f8d7da; }
+      .badge-pending { background: #664d03; color: #fff3cd; }
+      .badge-running { background: #055160; color: #cff4fc; }
+      .badge-done { background: #0f5132; color: #d1e7dd; }
+      .badge-failed { background: #842029; color: #f8d7da; }
+      .btn-primary:hover { background: #339af0; }
+      .btn-danger:hover { background: #fa5252; }
+    }
   </style>
 </head>
 <body>
