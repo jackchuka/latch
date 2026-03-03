@@ -252,6 +252,12 @@ func (m *Manager) Install(taskName, cron string) error {
 	return nil
 }
 
+// Installed reports whether a plist file exists for the given task.
+func (m *Manager) Installed(taskName string) bool {
+	_, err := os.Stat(m.plistPath(taskName))
+	return err == nil
+}
+
 // Uninstall attempts to unload the plist via launchctl, then deletes the file.
 // launchctl errors are ignored so that Uninstall works in test environments.
 func (m *Manager) Uninstall(taskName string) error {

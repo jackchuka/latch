@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackchuka/latch/internal/output"
 	"github.com/jackchuka/latch/internal/paths"
+	"github.com/jackchuka/latch/internal/scheduler"
 	"github.com/jackchuka/latch/internal/task"
 	"github.com/spf13/cobra"
 )
@@ -39,6 +40,8 @@ var listCmd = &cobra.Command{
 			return output.JSON(os.Stdout, tasks)
 		}
 
+		sched, _ := scheduler.New()
+
 		rows := make([][]string, len(tasks))
 		for i, tk := range tasks {
 			stepNames := ""
@@ -52,9 +55,17 @@ var listCmd = &cobra.Command{
 			if schedule == "" {
 				schedule = "-"
 			}
-			rows[i] = []string{tk.Name, schedule, stepNames}
+			installed := "-"
+			if sched != nil && tk.Schedule != "" {
+				if sched.Installed(tk.Name) {
+					installed = "yes"
+				} else {
+					installed = "no"
+				}
+			}
+			rows[i] = []string{tk.Name, schedule, installed, stepNames}
 		}
-		return output.Table(os.Stdout, []string{"Name", "Schedule", "Steps"}, rows)
+		return output.Table(os.Stdout, []string{"Name", "Schedule", "Installed", "Steps"}, rows)
 	},
 }
 

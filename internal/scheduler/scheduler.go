@@ -5,4 +5,5 @@ package scheduler
 type Scheduler interface {
 	Install(taskName, schedule string) error
 	Uninstall(taskName string) error
+	Installed(taskName string) bool
 }
