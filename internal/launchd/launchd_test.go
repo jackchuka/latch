@@ -1,6 +1,7 @@
 package launchd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,100 @@ func TestInstallAndUninstall(t *testing.T) {
 	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
 		t.Fatalf("expected plist file to be removed at %s", plistPath)
 	}
+}
+
+type cmdCall struct {
+	name string
+	args []string
+}
+
+func TestInstallCallsBootstrap(t *testing.T) {
+	dir := t.TempDir()
+	m := NewManager(dir)
+
+	var calls []cmdCall
+	m.runCmd = func(name string, args ...string) error {
+		calls = append(calls, cmdCall{name, args})
+		return nil
+	}
+
+	if err := m.Install("my-task", "0 9 * * *"); err != nil {
+		t.Fatalf("Install returned error: %v", err)
+	}
+
+	domain := fmt.Sprintf("gui/%d", os.Getuid())
+	plistPath := filepath.Join(dir, "com.latch.my-task.plist")
+
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 launchctl calls, got %d", len(calls))
+	}
+
+	// First call: bootout the old service
+	if calls[0].name != "launchctl" {
+		t.Errorf("expected launchctl, got %s", calls[0].name)
+	}
+	wantBootout := []string{"bootout", domain + "/com.latch.my-task"}
+	if !equalStrings(calls[0].args, wantBootout) {
+		t.Errorf("bootout args = %v, want %v", calls[0].args, wantBootout)
+	}
+
+	// Second call: bootstrap the new service
+	if calls[1].name != "launchctl" {
+		t.Errorf("expected launchctl, got %s", calls[1].name)
+	}
+	wantBootstrap := []string{"bootstrap", domain, plistPath}
+	if !equalStrings(calls[1].args, wantBootstrap) {
+		t.Errorf("bootstrap args = %v, want %v", calls[1].args, wantBootstrap)
+	}
+}
+
+func TestUninstallCallsBootout(t *testing.T) {
+	dir := t.TempDir()
+	m := NewManager(dir)
+
+	// Create a plist file so Uninstall has something to remove.
+	plistPath := filepath.Join(dir, "com.latch.my-task.plist")
+	if err := os.WriteFile(plistPath, []byte("test"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []cmdCall
+	m.runCmd = func(name string, args ...string) error {
+		calls = append(calls, cmdCall{name, args})
+		return nil
+	}
+
+	if err := m.Uninstall("my-task"); err != nil {
+		t.Fatalf("Uninstall returned error: %v", err)
+	}
+
+	domain := fmt.Sprintf("gui/%d", os.Getuid())
+
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 launchctl call, got %d", len(calls))
+	}
+
+	wantBootout := []string{"bootout", domain + "/com.latch.my-task"}
+	if !equalStrings(calls[0].args, wantBootout) {
+		t.Errorf("bootout args = %v, want %v", calls[0].args, wantBootout)
+	}
+
+	// Verify plist file was removed
+	if _, err := os.Stat(plistPath); !os.IsNotExist(err) {
+		t.Error("expected plist file to be removed")
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCronToCalendarInterval(t *testing.T) {
