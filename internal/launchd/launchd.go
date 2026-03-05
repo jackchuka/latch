@@ -204,6 +204,10 @@ func GeneratePlist(taskName, cron string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolving executable path: %w", err)
 	}
+	// Resolve symlinks so the plist references the canonical binary path.
+	if resolved, err := filepath.EvalSymlinks(binPath); err == nil {
+		binPath = resolved
+	}
 
 	intervals, err := cronToCalendarIntervals(cron)
 	if err != nil {
@@ -220,12 +224,17 @@ func GeneratePlist(taskName, cron string) (string, error) {
 
 // Manager handles installing and uninstalling launchd plist files.
 type Manager struct {
-	dir string
+	dir    string
+	runCmd func(name string, args ...string) error
+}
+
+func defaultRunCmd(name string, args ...string) error {
+	return exec.Command(name, args...).Run()
 }
 
 // NewManager creates a Manager that writes plist files to dir.
 func NewManager(dir string) *Manager {
-	return &Manager{dir: dir}
+	return &Manager{dir: dir, runCmd: defaultRunCmd}
 }
 
 func (m *Manager) plistPath(taskName string) string {
@@ -246,8 +255,14 @@ func (m *Manager) Install(taskName, cron string) error {
 		return fmt.Errorf("writing plist file: %w", err)
 	}
 
-	// Best-effort load; ignore errors for non-macOS or test environments.
-	_ = exec.Command("launchctl", "load", path).Run()
+	label := fmt.Sprintf("com.latch.%s", taskName)
+	domain := fmt.Sprintf("gui/%d", os.Getuid())
+
+	// Unload any previous version before loading the new one.
+	_ = m.runCmd("launchctl", "bootout", domain+"/"+label)
+
+	// Use modern bootstrap API for better TCC permission integration.
+	_ = m.runCmd("launchctl", "bootstrap", domain, path)
 
 	return nil
 }
@@ -262,9 +277,11 @@ func (m *Manager) Installed(taskName string) bool {
 // launchctl errors are ignored so that Uninstall works in test environments.
 func (m *Manager) Uninstall(taskName string) error {
 	path := m.plistPath(taskName)
+	label := fmt.Sprintf("com.latch.%s", taskName)
+	domain := fmt.Sprintf("gui/%d", os.Getuid())
 
 	// Best-effort unload; ignore errors for non-macOS or test environments.
-	_ = exec.Command("launchctl", "unload", path).Run()
+	_ = m.runCmd("launchctl", "bootout", domain+"/"+label)
 
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing plist file: %w", err)
