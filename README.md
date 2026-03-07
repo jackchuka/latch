@@ -110,6 +110,7 @@ This registers with launchd automatically. At 9 AM on weekdays, latch runs the p
 | `latch queue show <id>`    | Show a queued item                            |
 | `latch queue approve <id>` | Approve a queued item and resume the pipeline |
 | `latch queue reject <id>`  | Reject and discard a queued item              |
+| `latch queue rerun <id>`   | Rerun a queue item from a specific step       |
 | `latch queue clear`        | Clear finished (done) queue items             |
 | `latch queue clear --all`  | Clear all queue items including pending       |
 
