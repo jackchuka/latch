@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jackchuka/latch/internal/pipeline"
 	"github.com/jackchuka/latch/internal/queue"
 )
 
@@ -26,6 +27,10 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 	funcMap := template.FuncMap{
 		"statusClass": statusClass,
 		"formatTime":  formatTime,
+		"hasStep": func(m map[string]pipeline.StepResult, name string) bool {
+			_, ok := m[name]
+			return ok
+		},
 	}
 
 	// Parse shared templates (layout + partials) as a base, then clone per page
@@ -58,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /queue/{id}", s.handleShow)
 	mux.HandleFunc("POST /queue/{id}/approve", s.handleApprove)
 	mux.HandleFunc("POST /queue/{id}/reject", s.handleReject)
+	mux.HandleFunc("POST /queue/{id}/rerun", s.handleRerun)
 	mux.HandleFunc("POST /queue/clear", s.handleClear)
 	mux.HandleFunc("POST /queue/clear-all", s.handleClearAll)
 

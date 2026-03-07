@@ -16,7 +16,7 @@ func TestRunAllStepsNoApproval(t *testing.T) {
 		},
 	}
 
-	result, err := Run(tk, 0, 0)
+	result, err := RunWithContext(tk, 0, 0, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestRunPausesAtApproval(t *testing.T) {
 		},
 	}
 
-	result, err := Run(tk, 0, 0)
+	result, err := RunWithContext(tk, 0, 0, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestRunResumesFromStep(t *testing.T) {
 	}
 
 	// First run: pauses before draft (approve: true)
-	result1, err := Run(tk, 0, 0)
+	result1, err := RunWithContext(tk, 0, 0, nil)
 	if err != nil {
 		t.Fatalf("Run (first): %v", err)
 	}
@@ -85,7 +85,7 @@ func TestRunResumesFromStep(t *testing.T) {
 	}
 
 	// Resume from step 1 (draft) — approval clears the gate
-	result2, err := Run(tk, 1, 0)
+	result2, err := RunWithContext(tk, 1, 0, nil)
 	if err != nil {
 		t.Fatalf("Run (resume): %v", err)
 	}
@@ -140,7 +140,7 @@ func TestTemplateSubstitution(t *testing.T) {
 		},
 	}
 
-	result, err := Run(tk, 0, 0)
+	result, err := RunWithContext(tk, 0, 0, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRunErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tk := &task.Task{Name: "err_test", Steps: tt.steps}
 
-			result, err := Run(tk, 0, 0)
+			result, err := RunWithContext(tk, 0, 0, nil)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}

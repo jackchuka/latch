@@ -285,6 +285,69 @@ func TestSaveCreatesDirectory(t *testing.T) {
 	}
 }
 
+func TestRerunFields(t *testing.T) {
+	dir := t.TempDir()
+	q := New(dir)
+
+	item := &Item{
+		ID:             "rerun-001",
+		Task:           "deploy",
+		Status:         StatusRunning,
+		PausedAtStep:   1,
+		StepsCompleted: map[string]pipeline.StepResult{},
+		RerunFrom:      "original-001",
+		RerunFromStep:  "build",
+	}
+
+	if err := q.Save(item); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := q.Load("rerun-001")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if loaded.RerunFrom != "original-001" {
+		t.Errorf("RerunFrom: got %q, want %q", loaded.RerunFrom, "original-001")
+	}
+	if loaded.RerunFromStep != "build" {
+		t.Errorf("RerunFromStep: got %q, want %q", loaded.RerunFromStep, "build")
+	}
+}
+
+func TestRecoverStaleToFailed(t *testing.T) {
+	dir := t.TempDir()
+	q := New(dir)
+
+	// PID 999999999 should not exist
+	item := &Item{
+		ID:             "stale-001",
+		Task:           "deploy",
+		Status:         StatusRunning,
+		PID:            999999999,
+		StepsCompleted: map[string]pipeline.StepResult{},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	if err := q.RecoverStale(); err != nil {
+		t.Fatalf("RecoverStale: %v", err)
+	}
+
+	loaded, err := q.Load("stale-001")
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.Status != StatusFailed {
+		t.Errorf("Status: got %q, want %q", loaded.Status, StatusFailed)
+	}
+	if loaded.PID != 0 {
+		t.Errorf("PID: got %d, want 0", loaded.PID)
+	}
+}
+
 func TestMergeStepsNilMap(t *testing.T) {
 	item := &Item{}
 	item.MergeSteps(map[string]pipeline.StepResult{

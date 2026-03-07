@@ -3,10 +3,14 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"path/filepath"
 	"sort"
 
 	"github.com/jackchuka/latch/internal/detach"
 	"github.com/jackchuka/latch/internal/queue"
+	"github.com/jackchuka/latch/internal/rerun"
+	"github.com/jackchuka/latch/internal/task"
 )
 
 type indexData struct {
@@ -17,6 +21,7 @@ type indexData struct {
 
 type showData struct {
 	Item  *queue.Item
+	Task  *task.Task
 	Flash string
 	Error string
 }
@@ -60,8 +65,11 @@ func (s *Server) handleShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tk, _ := task.Load(filepath.Join(s.tasksDir, item.Task+".yaml"))
+
 	data := showData{
 		Item:  item,
+		Task:  tk,
 		Flash: r.URL.Query().Get("flash"),
 		Error: r.URL.Query().Get("error"),
 	}
@@ -74,7 +82,7 @@ func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	pid, err := detach.Approve(s.queue, id)
 	if err != nil {
-		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, err.Error()))
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape(err.Error())))
 		return
 	}
 	s.redirect(w, r, fmt.Sprintf("/queue/%s?flash=Approved+%%28pid+%d%%29", id, pid))
@@ -94,10 +102,35 @@ func (s *Server) handleReject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.queue.Delete(id); err != nil {
-		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, err.Error()))
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape(err.Error())))
 		return
 	}
 	s.redirect(w, r, "/?flash=Rejected+"+id)
+}
+
+func (s *Server) handleRerun(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	original, err := s.queue.Load(id)
+	if err != nil {
+		s.redirect(w, r, "/?error=Item+not+found")
+		return
+	}
+
+	tk, err := task.Load(filepath.Join(s.tasksDir, original.Task+".yaml"))
+	if err != nil {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=Task+not+found", id))
+		return
+	}
+
+	fromStep := r.FormValue("from")
+	result, err := rerun.Run(s.queue, original, tk, fromStep)
+	if err != nil {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape(err.Error())))
+		return
+	}
+
+	s.redirect(w, r, fmt.Sprintf("/queue/%s?flash=Rerun+started+%%28pid+%d%%29", result.Item.ID, result.PID))
 }
 
 func (s *Server) handleClear(w http.ResponseWriter, r *http.Request) {
