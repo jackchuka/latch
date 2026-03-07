@@ -19,15 +19,6 @@ func ResolveTimeout(tk *task.Task) time.Duration {
 	return time.Duration(timeout) * time.Second
 }
 
-// SaveResult creates a new queue item from a pipeline result and persists it.
-func SaveResult(q *queue.Queue, taskName string, result *pipeline.Result, runErr error) *queue.Item {
-	item := queue.NewItem(taskName, result.Status, result.StepsCompleted, result.PausedAtStep)
-	if runErr != nil {
-		item.Error = runErr.Error()
-	}
-	return item
-}
-
 // ApplyResult updates an existing queue item with pipeline results.
 func ApplyResult(item *queue.Item, result *pipeline.Result, runErr error) {
 	switch result.Status {

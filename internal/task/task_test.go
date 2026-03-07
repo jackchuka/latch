@@ -120,6 +120,36 @@ steps:
 	}
 }
 
+func TestStepIndex(t *testing.T) {
+	tk := &Task{
+		Steps: []Step{
+			{Name: "build"},
+			{Name: "test"},
+			{Name: "deploy"},
+		},
+	}
+
+	tests := []struct {
+		name string
+		step string
+		want int
+	}{
+		{"first", "build", 0},
+		{"middle", "test", 1},
+		{"last", "deploy", 2},
+		{"not found", "missing", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tk.StepIndex(tt.step)
+			if got != tt.want {
+				t.Errorf("StepIndex(%q) = %d, want %d", tt.step, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadAllTasks(t *testing.T) {
 	dir := t.TempDir()
 

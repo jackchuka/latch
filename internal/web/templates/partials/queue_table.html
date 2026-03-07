@@ -17,6 +17,10 @@
     <form method="POST" action="/queue/{{.ID}}/reject" style="display:inline;">
       <button class="btn btn-danger btn-sm" type="submit">Reject</button>
     </form>
+    {{- else if eq .Status "failed"}}
+    <form method="POST" action="/queue/{{.ID}}/rerun" style="display:inline;" title="Rerun from failed step">
+      <button class="btn btn-outline btn-sm" type="submit">Rerun</button>
+    </form>
     {{- end}}
   </td>
 </tr>

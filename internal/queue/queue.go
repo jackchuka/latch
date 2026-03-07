@@ -32,6 +32,8 @@ type Item struct {
 	Status         string                         `json:"status"`
 	Error          string                         `json:"error,omitempty"`
 	PID            int                            `json:"pid,omitempty"`
+	RerunFrom      string                         `json:"rerun_from,omitempty"`
+	RerunFromStep  string                         `json:"rerun_from_step,omitempty"`
 }
 
 // NewItem creates a queue Item from pipeline results.
@@ -127,7 +129,7 @@ func (q *Queue) ListPending() ([]*Item, error) {
 	return pending, nil
 }
 
-// RecoverStale resets running items whose PID is no longer alive back to pending.
+// RecoverStale marks running items whose PID is no longer alive as failed.
 func (q *Queue) RecoverStale() error {
 	all, err := q.ListAll()
 	if err != nil {
@@ -140,8 +142,8 @@ func (q *Queue) RecoverStale() error {
 		}
 		proc, err := os.FindProcess(item.PID)
 		if err != nil {
-			// Process doesn't exist — reset to pending.
-			item.Status = StatusPending
+			// Process doesn't exist — mark as failed.
+			item.Status = StatusFailed
 			item.PID = 0
 			if err := q.Save(item); err != nil {
 				return err
@@ -150,7 +152,7 @@ func (q *Queue) RecoverStale() error {
 		}
 		// On Unix, FindProcess always succeeds. Send signal 0 to check liveness.
 		if err := proc.Signal(syscall.Signal(0)); err != nil {
-			item.Status = StatusPending
+			item.Status = StatusFailed
 			item.PID = 0
 			if err := q.Save(item); err != nil {
 				return err

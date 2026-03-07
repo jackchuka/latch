@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -253,6 +255,142 @@ func TestHandleApproveNonPending(t *testing.T) {
 	loc := rec.Header().Get("Location")
 	if !containsString(loc, "error") {
 		t.Errorf("expected error in redirect location, got %q", loc)
+	}
+}
+
+func TestHandleShowWithStepTable(t *testing.T) {
+	srv, q := newTestServer(t)
+
+	taskYAML := []byte("name: deploy\nsteps:\n  - name: build\n    command: echo\n  - name: test\n    command: echo\n  - name: release\n    command: echo\n    approve: true\n")
+	if err := os.WriteFile(filepath.Join(srv.tasksDir, "deploy.yaml"), taskYAML, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	item := &queue.Item{
+		ID:           "show-steps-1",
+		Task:         "deploy",
+		Created:      time.Now(),
+		Status:       queue.StatusFailed,
+		PausedAtStep: 1,
+		StepsCompleted: map[string]pipeline.StepResult{
+			"build": {Output: "compiled ok", Duration: "1.2s"},
+		},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/queue/show-steps-1", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	if !containsString(body, "build") {
+		t.Error("expected 'build' step in response")
+	}
+	if !containsString(body, "test") {
+		t.Error("expected 'test' step in response")
+	}
+	if !containsString(body, "release") {
+		t.Error("expected 'release' step in response")
+	}
+	if !containsString(body, "Rerun from here") {
+		t.Error("expected rerun button in response")
+	}
+}
+
+func TestHandleRerunFailed(t *testing.T) {
+	srv, q := newTestServer(t)
+
+	taskYAML := []byte("name: deploy\nsteps:\n  - name: build\n    command: echo\n  - name: test\n    command: echo\n")
+	if err := os.WriteFile(filepath.Join(srv.tasksDir, "deploy.yaml"), taskYAML, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	item := &queue.Item{
+		ID:           "rerun-1",
+		Task:         "deploy",
+		Created:      time.Now(),
+		Status:       queue.StatusFailed,
+		PausedAtStep: 1,
+		StepsCompleted: map[string]pipeline.StepResult{
+			"build": {Output: "ok", Duration: "1s"},
+		},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/queue/rerun-1/rerun", strings.NewReader("from=build"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	loc := rec.Header().Get("Location")
+	if !containsString(loc, "flash") {
+		t.Errorf("expected flash in redirect, got %q", loc)
+	}
+}
+
+func TestHandleRerunRunningItem(t *testing.T) {
+	srv, q := newTestServer(t)
+
+	taskYAML := []byte("name: deploy\nsteps:\n  - name: build\n    command: echo\n")
+	if err := os.WriteFile(filepath.Join(srv.tasksDir, "deploy.yaml"), taskYAML, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	seedItem(t, q, "rerun-2", "deploy", queue.StatusRunning)
+
+	req := httptest.NewRequest("POST", "/queue/rerun-2/rerun", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	loc := rec.Header().Get("Location")
+	if !containsString(loc, "error") {
+		t.Errorf("expected error in redirect, got %q", loc)
+	}
+}
+
+func TestHandleRerunHtmx(t *testing.T) {
+	srv, q := newTestServer(t)
+
+	taskYAML := []byte("name: deploy\nsteps:\n  - name: build\n    command: echo\n")
+	if err := os.WriteFile(filepath.Join(srv.tasksDir, "deploy.yaml"), taskYAML, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	item := &queue.Item{
+		ID:             "rerun-3",
+		Task:           "deploy",
+		Created:        time.Now(),
+		Status:         queue.StatusFailed,
+		PausedAtStep:   0,
+		StepsCompleted: map[string]pipeline.StepResult{},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/queue/rerun-3/rerun", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if loc := rec.Header().Get("HX-Redirect"); loc == "" {
+		t.Error("expected HX-Redirect header")
 	}
 }
 

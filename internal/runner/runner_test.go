@@ -44,31 +44,6 @@ func TestResolveTimeout(t *testing.T) {
 	}
 }
 
-func TestSaveResult(t *testing.T) {
-	q := queue.New(t.TempDir())
-
-	steps := map[string]pipeline.StepResult{
-		"step1": {Output: "hello", Duration: "10ms"},
-	}
-	result := &pipeline.Result{
-		Status:         pipeline.StatusPaused,
-		StepsCompleted: steps,
-		PausedAtStep:   1,
-	}
-
-	item := runner.SaveResult(q, "my-task", result, nil)
-
-	if item.Task != "my-task" {
-		t.Errorf("Task = %q, want %q", item.Task, "my-task")
-	}
-	if item.Status != queue.StatusPending {
-		t.Errorf("Status = %q, want %q", item.Status, queue.StatusPending)
-	}
-	if item.PausedAtStep != 1 {
-		t.Errorf("PausedAtStep = %d, want 1", item.PausedAtStep)
-	}
-}
-
 func TestApplyResult(t *testing.T) {
 	tests := []struct {
 		name       string

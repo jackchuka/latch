@@ -27,6 +27,16 @@ type Step struct {
 	Approve bool     `yaml:"approve,omitempty" json:"approve,omitempty"`
 }
 
+// StepIndex returns the index of the named step, or -1 if not found.
+func (t *Task) StepIndex(name string) int {
+	for i, s := range t.Steps {
+		if s.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
 func Load(path string) (*Task, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

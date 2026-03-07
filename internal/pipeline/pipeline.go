@@ -28,11 +28,6 @@ type Result struct {
 	PausedAtStep   int
 }
 
-// Run executes a task's steps starting from startStep with no prior context.
-func Run(tk *task.Task, startStep int, timeout time.Duration) (*Result, error) {
-	return RunWithContext(tk, startStep, timeout, nil)
-}
-
 // RunWithContext executes a task's steps starting from startStep, seeded with
 // prior step results so that template substitution (e.g. {{.gather.output}})
 // works when resuming a paused pipeline.

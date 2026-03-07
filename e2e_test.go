@@ -50,9 +50,9 @@ steps:
 
 	// 4. Run pipeline from step 0 — should pause before deliver (approve: true)
 	q := queue.New(queueDir)
-	result, err := pipeline.Run(tk, 0, 0)
+	result, err := pipeline.RunWithContext(tk, 0, 0, nil)
 	if err != nil {
-		t.Fatalf("pipeline.Run: %v", err)
+		t.Fatalf("pipeline.RunWithContext: %v", err)
 	}
 
 	// 5. Verify paused — result.Status == pipeline.StatusPaused

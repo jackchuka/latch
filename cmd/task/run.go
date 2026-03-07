@@ -2,12 +2,11 @@ package taskcmd
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/jackchuka/latch/internal/detach"
 	"github.com/jackchuka/latch/internal/paths"
 	"github.com/jackchuka/latch/internal/pipeline"
 	"github.com/jackchuka/latch/internal/queue"
-	"github.com/jackchuka/latch/internal/runner"
 	"github.com/jackchuka/latch/internal/task"
 	"github.com/spf13/cobra"
 )
@@ -30,31 +29,18 @@ var runCmd = &cobra.Command{
 
 		q := queue.New(p.QueueDir())
 
-		timeout := runner.ResolveTimeout(tk)
-		result, runErr := pipeline.Run(tk, 0, timeout)
+		// NewItem with StatusPaused gives us a valid item; we override to running
+		// since this is a direct run, not a pipeline pause.
+		item := queue.NewItem(tk.Name, pipeline.StatusPaused, nil, 0)
+		item.Status = queue.StatusRunning
+		item.StepsCompleted = make(map[string]pipeline.StepResult)
 
-		item := runner.SaveResult(q, tk.Name, result, runErr)
-		if saveErr := q.Save(item); saveErr != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to save queue item: %v\n", saveErr)
+		pid, err := detach.Run(q, item)
+		if err != nil {
+			return err
 		}
 
-		if runErr != nil {
-			return fmt.Errorf("pipeline failed: %w", runErr)
-		}
-
-		switch result.Status {
-		case pipeline.StatusPaused:
-			var stepName string
-			if result.PausedAtStep >= 0 && result.PausedAtStep < len(tk.Steps) {
-				stepName = tk.Steps[result.PausedAtStep].Name
-			}
-
-			fmt.Printf("Pipeline paused at step '%s'. Run 'latch queue list' to review.\n", stepName)
-
-		case pipeline.StatusCompleted:
-			fmt.Printf("Pipeline completed: %s\n", tk.Name)
-		}
-
+		fmt.Printf("Running: %s (pid %d)\n", item.ID, pid)
 		return nil
 	},
 }

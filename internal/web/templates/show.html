@@ -29,10 +29,73 @@
   {{- end}}
 </div>
 
-{{- if .Item.StepsCompleted}}
+{{- if .Task}}
+<h3 style="margin-bottom: 0.5rem;">Steps</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Step</th>
+      <th>Status</th>
+      <th>Duration</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{- range $i, $step := .Task.Steps}}
+    {{- $result := index $.Item.StepsCompleted $step.Name}}
+    <tr>
+      <td>{{$step.Name}}</td>
+      {{- if hasStep $.Item.StepsCompleted $step.Name}}
+      <td><span class="badge badge-done">completed</span></td>
+      <td>{{$result.Duration}}</td>
+      <td>
+        <form method="POST" action="/queue/{{$.Item.ID}}/rerun" style="display:inline;">
+          <input type="hidden" name="from" value="{{$step.Name}}">
+          <button class="btn btn-outline btn-sm" type="submit">Rerun from here</button>
+        </form>
+      </td>
+      {{- else if and (eq $i $.Item.PausedAtStep) (eq $.Item.Status "failed")}}
+      <td><span class="badge badge-failed">failed</span></td>
+      <td>&mdash;</td>
+      <td>
+        <form method="POST" action="/queue/{{$.Item.ID}}/rerun" style="display:inline;">
+          <input type="hidden" name="from" value="{{$step.Name}}">
+          <button class="btn btn-outline btn-sm" type="submit">Rerun from here</button>
+        </form>
+      </td>
+      {{- else}}
+      <td><span style="color: var(--text-muted);">&mdash;</span></td>
+      <td>&mdash;</td>
+      <td>&mdash;</td>
+      {{- end}}
+    </tr>
+    {{- if hasStep $.Item.StepsCompleted $step.Name}}
+    {{- if $result.Output}}
+    <tr>
+      <td colspan="4" style="padding: 0; border-bottom: 1px solid var(--border);">
+        <details class="step-output">
+          <summary>Show output</summary>
+          <pre>{{$result.Output}}</pre>
+        </details>
+      </td>
+    </tr>
+    {{- end}}
+    {{- else if and (eq $i $.Item.PausedAtStep) (eq $.Item.Status "failed") $.Item.Error}}
+    <tr>
+      <td colspan="4" style="padding: 0; border-bottom: 1px solid var(--border);">
+        <div class="step-output" style="padding: 0.5rem 0.75rem;">
+          <pre style="color: var(--danger);">{{$.Item.Error}}</pre>
+        </div>
+      </td>
+    </tr>
+    {{- end}}
+  {{- end}}
+  </tbody>
+</table>
+{{- else if .Item.StepsCompleted}}
 <h3 style="margin-bottom: 0.5rem;">Step Outputs</h3>
 {{- range $name, $result := .Item.StepsCompleted}}
-<details>
+<details class="step-output">
   <summary>{{$name}} <span style="font-weight:normal; color: var(--text-muted);">({{$result.Duration}})</span></summary>
   <pre>{{$result.Output}}</pre>
 </details>
