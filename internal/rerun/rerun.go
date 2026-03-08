@@ -19,7 +19,7 @@ type Result struct {
 // Run creates a new queue item from an existing one and spawns background execution.
 // If fromStep is empty, it defaults to the original's paused/failed step.
 func Run(q *queue.Queue, original *queue.Item, tk *task.Task, fromStep string) (*Result, error) {
-	if original.Status == queue.StatusRunning || original.Status == queue.StatusPending {
+	if original.Status == queue.StatusRunning {
 		return nil, fmt.Errorf("item %s cannot be rerun (status: %s)", original.ID, original.Status)
 	}
 
