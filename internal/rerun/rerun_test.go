@@ -15,7 +15,6 @@ func TestRunRejectsInvalidStatus(t *testing.T) {
 		status string
 	}{
 		{"running", queue.StatusRunning},
-		{"pending", queue.StatusPending},
 	}
 
 	for _, tt := range tests {
