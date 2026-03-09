@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/jackchuka/latch/internal/detach"
+	"github.com/jackchuka/latch/internal/pipeline"
 	"github.com/jackchuka/latch/internal/queue"
 	"github.com/jackchuka/latch/internal/rerun"
 	"github.com/jackchuka/latch/internal/task"
@@ -17,6 +18,7 @@ type indexData struct {
 	Items []*queue.Item
 	Flash string
 	Error string
+	Nav   string
 }
 
 type showData struct {
@@ -24,6 +26,7 @@ type showData struct {
 	Task  *task.Task
 	Flash string
 	Error string
+	Nav   string
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +41,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Items: items,
 		Flash: r.URL.Query().Get("flash"),
 		Error: r.URL.Query().Get("error"),
+		Nav:   "queue",
 	}
 	if err := s.index.ExecuteTemplate(w, "index.html", data); err != nil {
 		s.logger.Printf("template error: %v", err)
@@ -72,6 +76,7 @@ func (s *Server) handleShow(w http.ResponseWriter, r *http.Request) {
 		Task:  tk,
 		Flash: r.URL.Query().Get("flash"),
 		Error: r.URL.Query().Get("error"),
+		Nav:   "queue",
 	}
 	if err := s.show.ExecuteTemplate(w, "show.html", data); err != nil {
 		s.logger.Printf("template error: %v", err)
@@ -163,11 +168,56 @@ func (s *Server) redirect(w http.ResponseWriter, r *http.Request, target string)
 
 func (s *Server) renderError(w http.ResponseWriter, _ *http.Request, msg string, code int) {
 	w.WriteHeader(code)
-	data := indexData{Error: msg}
+	data := indexData{Error: msg, Nav: "queue"}
 	if err := s.index.ExecuteTemplate(w, "index.html", data); err != nil {
 		s.logger.Printf("template error: %v", err)
 		http.Error(w, msg, code)
 	}
+}
+
+type tasksData struct {
+	Tasks []*task.Task
+	Flash string
+	Error string
+	Nav   string
+}
+
+func (s *Server) handleTaskList(w http.ResponseWriter, r *http.Request) {
+	tasks, err := task.LoadAll(s.tasksDir)
+	if err != nil {
+		s.renderError(w, r, "Failed to load tasks: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data := tasksData{
+		Tasks: tasks,
+		Flash: r.URL.Query().Get("flash"),
+		Error: r.URL.Query().Get("error"),
+		Nav:   "tasks",
+	}
+	if err := s.tasks.ExecuteTemplate(w, "tasks.html", data); err != nil {
+		s.logger.Printf("template error: %v", err)
+	}
+}
+
+func (s *Server) handleTaskRun(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	tk, err := task.Load(filepath.Join(s.tasksDir, name+".yaml"))
+	if err != nil {
+		s.redirect(w, r, "/tasks?error="+url.QueryEscape("Task not found: "+name))
+		return
+	}
+
+	item := queue.NewItem(tk.Name, pipeline.StatusPaused, nil, 0)
+	item.Status = queue.StatusRunning
+	item.StepsCompleted = make(map[string]pipeline.StepResult)
+
+	pid, err := detach.Run(s.queue, item)
+	if err != nil {
+		s.redirect(w, r, "/tasks?error="+url.QueryEscape(err.Error()))
+		return
+	}
+
+	s.redirect(w, r, fmt.Sprintf("/?flash=Running+%s+%%28pid+%d%%29", tk.Name, pid))
 }
 
 // sortItems orders items: pending first, then running, then by created descending.
