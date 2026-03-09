@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackchuka/latch/internal/pipeline"
@@ -21,6 +22,7 @@ type Server struct {
 	index    *template.Template
 	show     *template.Template
 	tasks    *template.Template
+	taskEdit *template.Template
 	partial  *template.Template
 }
 
@@ -31,6 +33,9 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 		"hasStep": func(m map[string]pipeline.StepResult, name string) bool {
 			_, ok := m[name]
 			return ok
+		},
+		"joinArgs": func(args []string) string {
+			return strings.Join(args, ", ")
 		},
 	}
 
@@ -46,6 +51,7 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 	index := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/index.html"))
 	show := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/show.html"))
 	tasks := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/tasks.html"))
+	taskEdit := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/task_edit.html"))
 
 	return &Server{
 		queue:    q,
@@ -54,6 +60,7 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 		index:    index,
 		show:     show,
 		tasks:    tasks,
+		taskEdit: taskEdit,
 		partial:  base,
 	}
 }
@@ -70,6 +77,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /queue/clear", s.handleClear)
 	mux.HandleFunc("POST /queue/clear-all", s.handleClearAll)
 	mux.HandleFunc("GET /tasks", s.handleTaskList)
+	mux.HandleFunc("GET /tasks/{name}", s.handleTaskEdit)
+	mux.HandleFunc("POST /tasks/{name}", s.handleTaskSave)
 	mux.HandleFunc("POST /tasks/{name}/run", s.handleTaskRun)
 
 	return mux

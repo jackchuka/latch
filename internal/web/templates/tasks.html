@@ -18,7 +18,7 @@
   <tbody>
   {{- range .Tasks}}
     <tr>
-      <td>{{.Name}}</td>
+      <td><a href="/tasks/{{.Name}}">{{.Name}}</a></td>
       <td>{{if .Schedule}}{{.Schedule}}{{else}}&mdash;{{end}}</td>
       <td>{{len .Steps}} steps</td>
       <td>{{if .Timeout}}{{.Timeout}}s{{else}}&mdash;{{end}}</td>

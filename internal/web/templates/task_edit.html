@@ -1,0 +1,89 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<p style="margin-bottom: 1rem;"><a href="/tasks">&larr; Back to tasks</a></p>
+<form method="POST" action="/tasks/{{.Task.Name}}" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <div class="card">
+    <h2 style="margin-bottom: 0.75rem;">{{.Task.Name}}</h2>
+    <dl class="meta">
+      <dt>Schedule</dt>
+      <dd><input type="text" name="schedule" value="{{.Task.Schedule}}" placeholder="e.g. 0 9 * * 1-5" style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.9rem;background:var(--surface);color:var(--text);"></dd>
+      <dt>Timeout</dt>
+      <dd><input type="number" name="timeout" value="{{.Task.Timeout}}" placeholder="seconds" min="0" style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.9rem;background:var(--surface);color:var(--text);"></dd>
+    </dl>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+    <h3>Steps</h3>
+    <button type="button" class="btn btn-outline btn-sm" onclick="addStep()">+ Add step</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Command</th>
+        <th>Args</th>
+        <th>Approve</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="steps-body">
+    {{- range $i, $step := .Task.Steps}}
+      <tr>
+        <td><input type="text" name="steps[{{$i}}].name" value="{{$step.Name}}" required style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;background:var(--surface);color:var(--text);"></td>
+        <td><input type="text" name="steps[{{$i}}].command" value="{{$step.Command}}" required style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;background:var(--surface);color:var(--text);"></td>
+        <td><textarea name="steps[{{$i}}].args" placeholder="arg1, arg2, ..." rows="2" style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;background:var(--surface);color:var(--text);resize:vertical;">{{joinArgs $step.Args}}</textarea></td>
+        <td style="text-align:center;"><input type="checkbox" name="steps[{{$i}}].approve" value="true" {{if $step.Approve}}checked{{end}}></td>
+        <td style="white-space:nowrap;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="moveStep(this,-1)" title="Move up">&uarr;</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="moveStep(this,1)" title="Move down">&darr;</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeStep(this)" title="Delete">&times;</button>
+        </td>
+      </tr>
+    {{- end}}
+    </tbody>
+  </table>
+
+  <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="/tasks" class="btn btn-outline">Cancel</a>
+  </div>
+</form>
+
+<script>
+function reindex() {
+  document.querySelectorAll('#steps-body tr').forEach(function(row, i) {
+    row.querySelectorAll('input, textarea').forEach(function(input) {
+      var name = input.getAttribute('name');
+      if (name) input.setAttribute('name', name.replace(/steps\[\d+\]/, 'steps['+i+']'));
+    });
+  });
+}
+function addStep() {
+  var tbody = document.getElementById('steps-body');
+  var i = tbody.rows.length;
+  var tr = document.createElement('tr');
+  tr.innerHTML = '<td><input type="text" name="steps['+i+'].name" required style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;background:var(--surface);color:var(--text);"></td>'
+    + '<td><input type="text" name="steps['+i+'].command" required style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;background:var(--surface);color:var(--text);"></td>'
+    + '<td><textarea name="steps['+i+'].args" placeholder="arg1, arg2, ..." rows="2" style="width:100%;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:4px;font-size:0.85rem;background:var(--surface);color:var(--text);resize:vertical;"></textarea></td>'
+    + '<td style="text-align:center;"><input type="checkbox" name="steps['+i+'].approve" value="true"></td>'
+    + '<td style="white-space:nowrap;"><button type="button" class="btn btn-outline btn-sm" onclick="moveStep(this,-1)" title="Move up">&uarr;</button> <button type="button" class="btn btn-outline btn-sm" onclick="moveStep(this,1)" title="Move down">&darr;</button> <button type="button" class="btn btn-danger btn-sm" onclick="removeStep(this)" title="Delete">&times;</button></td>';
+  tbody.appendChild(tr);
+}
+function removeStep(btn) {
+  btn.closest('tr').remove();
+  reindex();
+}
+function moveStep(btn, dir) {
+  var row = btn.closest('tr');
+  var tbody = row.parentNode;
+  var rows = Array.from(tbody.rows);
+  var idx = rows.indexOf(row);
+  var target = idx + dir;
+  if (target < 0 || target >= rows.length) return;
+  if (dir === -1) tbody.insertBefore(row, rows[target]);
+  else tbody.insertBefore(rows[target], row);
+  reindex();
+}
+</script>
+{{end}}

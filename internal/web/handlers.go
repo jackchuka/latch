@@ -6,11 +6,14 @@ import (
 	"net/url"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jackchuka/latch/internal/detach"
 	"github.com/jackchuka/latch/internal/pipeline"
 	"github.com/jackchuka/latch/internal/queue"
 	"github.com/jackchuka/latch/internal/rerun"
+	"github.com/jackchuka/latch/internal/scheduler"
 	"github.com/jackchuka/latch/internal/task"
 )
 
@@ -218,6 +221,105 @@ func (s *Server) handleTaskRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.redirect(w, r, fmt.Sprintf("/?flash=Running+%s+%%28pid+%d%%29", tk.Name, pid))
+}
+
+type taskEditData struct {
+	Task  *task.Task
+	Flash string
+	Error string
+	Nav   string
+}
+
+func (s *Server) handleTaskEdit(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	tk, err := task.Load(filepath.Join(s.tasksDir, name+".yaml"))
+	if err != nil {
+		s.redirect(w, r, "/tasks?error="+url.QueryEscape("Task not found: "+name))
+		return
+	}
+	data := taskEditData{
+		Task:  tk,
+		Flash: r.URL.Query().Get("flash"),
+		Error: r.URL.Query().Get("error"),
+		Nav:   "tasks",
+	}
+	if err := s.taskEdit.ExecuteTemplate(w, "task_edit.html", data); err != nil {
+		s.logger.Printf("template error: %v", err)
+	}
+}
+
+func (s *Server) handleTaskSave(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if err := r.ParseForm(); err != nil {
+		s.redirect(w, r, fmt.Sprintf("/tasks/%s?error=%s", name, url.QueryEscape("Invalid form data")))
+		return
+	}
+
+	oldTask, err := task.Load(filepath.Join(s.tasksDir, name+".yaml"))
+	if err != nil {
+		s.redirect(w, r, "/tasks?error="+url.QueryEscape("Task not found: "+name))
+		return
+	}
+
+	var timeout int
+	if v := r.FormValue("timeout"); v != "" {
+		timeout, _ = strconv.Atoi(v)
+	}
+
+	var steps []task.Step
+	for i := 0; ; i++ {
+		prefix := fmt.Sprintf("steps[%d].", i)
+		stepName := r.FormValue(prefix + "name")
+		if stepName == "" {
+			break
+		}
+		argsRaw := r.FormValue(prefix + "args")
+		var args []string
+		if argsRaw != "" {
+			for _, a := range strings.Split(argsRaw, ",") {
+				a = strings.TrimSpace(a)
+				if a != "" {
+					args = append(args, a)
+				}
+			}
+		}
+		steps = append(steps, task.Step{
+			Name:    stepName,
+			Command: r.FormValue(prefix + "command"),
+			Args:    args,
+			Approve: r.FormValue(prefix+"approve") == "true",
+		})
+	}
+
+	tk := &task.Task{
+		Name:     name,
+		Schedule: strings.TrimSpace(r.FormValue("schedule")),
+		Timeout:  timeout,
+		Steps:    steps,
+	}
+
+	if err := tk.Validate(); err != nil {
+		s.redirect(w, r, fmt.Sprintf("/tasks/%s?error=%s", name, url.QueryEscape(err.Error())))
+		return
+	}
+
+	if err := task.Save(filepath.Join(s.tasksDir, name+".yaml"), tk); err != nil {
+		s.redirect(w, r, fmt.Sprintf("/tasks/%s?error=%s", name, url.QueryEscape("Failed to save: "+err.Error())))
+		return
+	}
+
+	if tk.Schedule != oldTask.Schedule {
+		sched, err := scheduler.New()
+		if err == nil {
+			if tk.Schedule == "" {
+				_ = sched.Uninstall(name)
+			} else {
+				_ = sched.Install(name, tk.Schedule)
+			}
+		}
+	}
+
+	s.redirect(w, r, fmt.Sprintf("/tasks/%s?flash=Saved", name))
 }
 
 // sortItems orders items: pending first, then running, then by created descending.
