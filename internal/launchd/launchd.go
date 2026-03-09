@@ -204,10 +204,6 @@ func GeneratePlist(taskName, cron string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolving executable path: %w", err)
 	}
-	// Resolve symlinks so the plist references the canonical binary path.
-	if resolved, err := filepath.EvalSymlinks(binPath); err == nil {
-		binPath = resolved
-	}
 
 	intervals, err := cronToCalendarIntervals(cron)
 	if err != nil {
