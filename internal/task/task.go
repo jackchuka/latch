@@ -37,25 +37,53 @@ func (t *Task) StepIndex(name string) int {
 	return -1
 }
 
+func (t *Task) Validate() error {
+	if t.Name == "" {
+		return fmt.Errorf("task name is required")
+	}
+	if len(t.Steps) == 0 {
+		return fmt.Errorf("task must have at least one step")
+	}
+	seen := make(map[string]bool)
+	for _, s := range t.Steps {
+		if s.Name == "" {
+			return fmt.Errorf("step name is required")
+		}
+		if !validName.MatchString(s.Name) {
+			return fmt.Errorf("step name %q is not a valid identifier (use letters, digits, underscores)", s.Name)
+		}
+		if s.Command == "" {
+			return fmt.Errorf("step %q: command is required", s.Name)
+		}
+		if seen[s.Name] {
+			return fmt.Errorf("duplicate step name: %q", s.Name)
+		}
+		seen[s.Name] = true
+	}
+	return nil
+}
+
 func Load(path string) (*Task, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-
 	var t Task
 	if err := yaml.Unmarshal(data, &t); err != nil {
 		return nil, err
 	}
-	if t.Name == "" {
-		return nil, fmt.Errorf("task name is required")
-	}
-	for _, s := range t.Steps {
-		if !validName.MatchString(s.Name) {
-			return nil, fmt.Errorf("step name %q is not a valid identifier (use letters, digits, underscores); referenced in templates as {{.%s.output}}", s.Name, s.Name)
-		}
+	if err := t.Validate(); err != nil {
+		return nil, err
 	}
 	return &t, nil
+}
+
+func Save(path string, t *Task) error {
+	data, err := yaml.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("marshal task: %w", err)
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 func LoadAll(dir string) ([]*Task, error) {
