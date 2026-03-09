@@ -4,6 +4,6 @@ package detach
 
 import "syscall"
 
-func detachAttr() *syscall.SysProcAttr {
+func DetachAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setsid: true}
 }

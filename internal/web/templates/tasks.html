@@ -1,0 +1,35 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<h2 style="margin: 1rem 0 0.5rem;">Tasks</h2>
+{{- if not .Tasks}}
+<div class="empty">No tasks registered.</div>
+{{- else}}
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Schedule</th>
+      <th>Steps</th>
+      <th>Timeout</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{- range .Tasks}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{if .Schedule}}{{.Schedule}}{{else}}&mdash;{{end}}</td>
+      <td>{{len .Steps}} steps</td>
+      <td>{{if .Timeout}}{{.Timeout}}s{{else}}&mdash;{{end}}</td>
+      <td>
+        <form method="POST" action="/tasks/{{.Name}}/run" style="display:inline;">
+          <button class="btn btn-primary btn-sm" type="submit">Run</button>
+        </form>
+      </td>
+    </tr>
+  {{- end}}
+  </tbody>
+</table>
+{{- end}}
+{{end}}

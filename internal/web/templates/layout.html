@@ -89,7 +89,11 @@
   </style>
 </head>
 <body>
-  <nav><div class="container"><a href="/">Latch Dashboard</a></div></nav>
+  <nav><div class="container" style="display:flex;gap:1.5rem;align-items:center;">
+    <a href="/" style="font-size:1.1rem;font-weight:700;">Latch</a>
+    <a href="/" style="font-size:0.9rem;opacity:{{if eq .Nav "queue"}}1{{else}}0.6{{end}}">Queue</a>
+    <a href="/tasks" style="font-size:0.9rem;opacity:{{if eq .Nav "tasks"}}1{{else}}0.6{{end}}">Tasks</a>
+  </div></nav>
   <div class="container">
     {{- if .Flash}}
     <div class="flash flash-success">{{.Flash}}</div>

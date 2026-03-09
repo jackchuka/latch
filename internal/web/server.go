@@ -20,6 +20,7 @@ type Server struct {
 	logger   *log.Logger
 	index    *template.Template
 	show     *template.Template
+	tasks    *template.Template
 	partial  *template.Template
 }
 
@@ -44,6 +45,7 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 
 	index := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/index.html"))
 	show := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/show.html"))
+	tasks := template.Must(template.Must(base.Clone()).ParseFS(templateFS, "templates/tasks.html"))
 
 	return &Server{
 		queue:    q,
@@ -51,6 +53,7 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 		logger:   logger,
 		index:    index,
 		show:     show,
+		tasks:    tasks,
 		partial:  base,
 	}
 }
@@ -66,6 +69,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /queue/{id}/rerun", s.handleRerun)
 	mux.HandleFunc("POST /queue/clear", s.handleClear)
 	mux.HandleFunc("POST /queue/clear-all", s.handleClearAll)
+	mux.HandleFunc("GET /tasks", s.handleTaskList)
+	mux.HandleFunc("POST /tasks/{name}/run", s.handleTaskRun)
 
 	return mux
 }

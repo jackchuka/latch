@@ -45,7 +45,7 @@ func Run(q *queue.Queue, item *queue.Item) (int, error) {
 	}
 
 	bg := exec.Command(exe, "queue", "exec", item.ID)
-	bg.SysProcAttr = detachAttr()
+	bg.SysProcAttr = DetachAttr()
 	if err := bg.Start(); err != nil {
 		item.Status = queue.StatusFailed
 		item.Error = fmt.Sprintf("start background execution: %v", err)
