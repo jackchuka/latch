@@ -4,10 +4,10 @@
 {{- else}}
 {{- range .}}
 <tr>
-  <td><a href="/queue/{{.ID}}">{{.ID}}</a></td>
-  <td>{{.Task}}</td>
+  <td class="mono"><a href="/queue/{{.ID}}" title="{{.ID}}">{{truncateID .ID}}</a></td>
+  <td><a href="/tasks/{{.Task}}">{{.Task}}</a></td>
   <td><span class="badge badge-{{statusClass .Status}}">{{.Status}}</span></td>
-  <td>{{formatTime .Created}}</td>
+  <td title="{{formatTime .Created}}">{{relativeTime .Created}}</td>
   <td>{{.PausedAtStep}}</td>
   <td>
     {{- if eq .Status "pending"}}
@@ -15,7 +15,7 @@
       <button class="btn btn-primary btn-sm" type="submit">Approve</button>
     </form>
     <form method="POST" action="/queue/{{.ID}}/reject" style="display:inline;">
-      <button class="btn btn-danger btn-sm" type="submit">Reject</button>
+      <button class="btn btn-danger btn-sm" type="button" onclick="showConfirm('Reject this item?', this.closest('form'))">Reject</button>
     </form>
     {{- else if eq .Status "failed"}}
     <form method="POST" action="/queue/{{.ID}}/rerun" style="display:inline;" title="Rerun from failed step">

@@ -27,7 +27,8 @@
     nav a { color: #fff; font-weight: 600; font-size: 1.1rem; }
     nav a:hover { text-decoration: none; opacity: 0.9; }
 
-    .flash { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    .flash-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 50; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
+    .flash { padding: 0.75rem 1.25rem; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
     .flash-success { background: #d1e7dd; color: #0f5132; }
     .flash-error { background: #f8d7da; color: #842029; }
 
@@ -62,6 +63,20 @@
     .step-output summary { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
     .step-output pre { border-radius: 0; margin: 0; background: #f0f1f3; }
     .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+    tbody tr:hover { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+    .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 0.83rem; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .badge-running { animation: pulse 2s ease-in-out infinite; }
+
+    .flash { transition: opacity 0.4s ease; }
+    .flash.fade-out { opacity: 0; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--surface); border-radius: 8px; padding: 1.25rem; box-shadow: 0 8px 24px rgba(0,0,0,0.2); max-width: 360px; width: 90%; }
+    .modal p { margin-bottom: 1rem; font-size: 0.95rem; }
+    .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 
     @media (prefers-color-scheme: dark) {
       :root {
@@ -95,13 +110,54 @@
     <a href="/tasks" style="font-size:0.9rem;opacity:{{if eq .Nav "tasks"}}1{{else}}0.6{{end}}">Tasks</a>
   </div></nav>
   <div class="container">
+    {{template "content" .}}
+  </div>
+  {{- if or .Flash .Error}}
+  <div class="flash-container">
     {{- if .Flash}}
     <div class="flash flash-success">{{.Flash}}</div>
     {{- end}}
     {{- if .Error}}
     <div class="flash flash-error">{{.Error}}</div>
     {{- end}}
-    {{template "content" .}}
   </div>
+  {{- end}}
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal">
+      <p id="confirm-msg"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeConfirm()">Cancel</button>
+        <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+  <script>
+  document.querySelectorAll('.flash-success').forEach(function(el) {
+    setTimeout(function() {
+      el.classList.add('fade-out');
+      setTimeout(function() { el.remove(); }, 400);
+    }, 3000);
+  });
+  var confirmForm = null;
+  function showConfirm(msg, form) {
+    confirmForm = form;
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('confirm-modal').classList.add('active');
+  }
+  function closeConfirm() {
+    document.getElementById('confirm-modal').classList.remove('active');
+    confirmForm = null;
+  }
+  document.getElementById('confirm-ok').addEventListener('click', function() {
+    if (confirmForm) confirmForm.submit();
+    closeConfirm();
+  });
+  document.getElementById('confirm-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeConfirm();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeConfirm();
+  });
+  </script>
 </body>
 </html>
