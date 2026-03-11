@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -28,14 +29,21 @@ type Server struct {
 
 func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 	funcMap := template.FuncMap{
-		"statusClass": statusClass,
-		"formatTime":  formatTime,
+		"statusClass":  statusClass,
+		"formatTime":   formatTime,
+		"relativeTime": relativeTime,
 		"hasStep": func(m map[string]pipeline.StepResult, name string) bool {
 			_, ok := m[name]
 			return ok
 		},
 		"joinArgs": func(args []string) string {
 			return strings.Join(args, ", ")
+		},
+		"truncateID": func(id string) string {
+			if len(id) > 15 {
+				return id[:15]
+			}
+			return id
 		},
 	}
 
@@ -101,4 +109,30 @@ func statusClass(status string) string {
 
 func formatTime(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
+}
+
+func relativeTime(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		m := int(d.Minutes())
+		if m == 1 {
+			return "1 min ago"
+		}
+		return fmt.Sprintf("%d min ago", m)
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		if h == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", h)
+	default:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1 day ago"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	}
 }

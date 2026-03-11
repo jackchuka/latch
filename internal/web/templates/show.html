@@ -5,7 +5,7 @@
 <div class="card">
   <h2 style="margin-bottom: 0.75rem;">{{.Item.ID}}</h2>
   <dl class="meta">
-    <dt>Task</dt><dd>{{.Item.Task}}</dd>
+    <dt>Task</dt><dd><a href="/tasks/{{.Item.Task}}">{{.Item.Task}}</a></dd>
     <dt>Status</dt><dd><span class="badge badge-{{statusClass .Item.Status}}">{{.Item.Status}}</span></dd>
     <dt>Created</dt><dd>{{formatTime .Item.Created}}</dd>
     <dt>Paused Step</dt><dd>{{.Item.PausedAtStep}}</dd>
@@ -23,7 +23,7 @@
       <button class="btn btn-primary" type="submit">Approve</button>
     </form>
     <form method="POST" action="/queue/{{.Item.ID}}/reject">
-      <button class="btn btn-danger" type="submit">Reject</button>
+      <button class="btn btn-danger" type="button" onclick="showConfirm('Reject this item?', this.closest('form'))">Reject</button>
     </form>
   </div>
   {{- end}}
