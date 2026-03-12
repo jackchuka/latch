@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	StatusPending = "pending"
-	StatusRunning = "running"
-	StatusDone    = "done"
-	StatusFailed  = "failed"
+	StatusPending  = "pending"
+	StatusRunning  = "running"
+	StatusDone     = "done"
+	StatusFailed   = "failed"
+	StatusRejected = "rejected"
 )
 
 type Item struct {

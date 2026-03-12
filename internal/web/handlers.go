@@ -109,7 +109,8 @@ func (s *Server) handleReject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.queue.Delete(id); err != nil {
+	item.Status = queue.StatusRejected
+	if err := s.queue.Save(item); err != nil {
 		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape(err.Error())))
 		return
 	}
@@ -142,7 +143,7 @@ func (s *Server) handleRerun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClear(w http.ResponseWriter, r *http.Request) {
-	n, err := s.queue.DeleteByStatus(queue.StatusDone)
+	n, err := s.queue.DeleteByStatus(queue.StatusDone, queue.StatusRejected)
 	if err != nil {
 		s.redirect(w, r, "/?error="+err.Error())
 		return
@@ -151,7 +152,7 @@ func (s *Server) handleClear(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClearAll(w http.ResponseWriter, r *http.Request) {
-	n, err := s.queue.DeleteByStatus(queue.StatusPending, queue.StatusRunning, queue.StatusDone, queue.StatusFailed)
+	n, err := s.queue.DeleteByStatus(queue.StatusPending, queue.StatusRunning, queue.StatusDone, queue.StatusFailed, queue.StatusRejected)
 	if err != nil {
 		s.redirect(w, r, "/?error="+err.Error())
 		return
@@ -325,10 +326,11 @@ func (s *Server) handleTaskSave(w http.ResponseWriter, r *http.Request) {
 // sortItems orders items: pending first, then running, then by created descending.
 func sortItems(items []*queue.Item) {
 	statusOrder := map[string]int{
-		queue.StatusPending: 0,
-		queue.StatusRunning: 1,
-		queue.StatusFailed:  2,
-		queue.StatusDone:    3,
+		queue.StatusPending:  0,
+		queue.StatusRunning:  1,
+		queue.StatusFailed:   2,
+		queue.StatusRejected: 3,
+		queue.StatusDone:     4,
 	}
 	sort.Slice(items, func(i, j int) bool {
 		oi, oj := statusOrder[items[i].Status], statusOrder[items[j].Status]
