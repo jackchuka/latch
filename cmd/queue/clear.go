@@ -34,7 +34,7 @@ var clearCmd = &cobra.Command{
 			return nil
 		}
 
-		n, err := q.DeleteByStatus(queue.StatusDone)
+		n, err := q.DeleteByStatus(queue.StatusDone, queue.StatusRejected)
 		if err != nil {
 			return fmt.Errorf("clear queue: %w", err)
 		}

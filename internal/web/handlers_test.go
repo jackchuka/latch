@@ -148,10 +148,12 @@ func TestHandleReject(t *testing.T) {
 		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 
-	// Item should be deleted
-	_, err := q.Load("rej-1")
-	if err == nil {
-		t.Fatal("expected item to be deleted after reject")
+	item, err := q.Load("rej-1")
+	if err != nil {
+		t.Fatalf("expected item to still exist after reject: %v", err)
+	}
+	if item.Status != queue.StatusRejected {
+		t.Errorf("status: got %q, want %q", item.Status, queue.StatusRejected)
 	}
 }
 

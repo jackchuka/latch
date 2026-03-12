@@ -28,8 +28,9 @@ var rejectCmd = &cobra.Command{
 			return fmt.Errorf("item %s is not pending (status: %s)", id, item.Status)
 		}
 
-		if err := q.Delete(id); err != nil {
-			return fmt.Errorf("delete queue item: %w", err)
+		item.Status = queue.StatusRejected
+		if err := q.Save(item); err != nil {
+			return fmt.Errorf("reject queue item: %w", err)
 		}
 
 		fmt.Printf("Rejected: %s\n", id)

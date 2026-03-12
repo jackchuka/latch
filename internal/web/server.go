@@ -102,6 +102,8 @@ func statusClass(status string) string {
 		return "done"
 	case queue.StatusFailed:
 		return "failed"
+	case queue.StatusRejected:
+		return "rejected"
 	default:
 		return "pending"
 	}
