@@ -12,8 +12,16 @@ import (
 )
 
 type StepResult struct {
-	Output   string `json:"output"`
-	Duration string `json:"duration"`
+	Output         string `json:"output"`
+	Duration       string `json:"duration"`
+	OutputOverride string `json:"output_override,omitempty"`
+}
+
+func (r StepResult) EffectiveOutput() string {
+	if r.OutputOverride != "" {
+		return r.OutputOverride
+	}
+	return r.Output
 }
 
 const (
@@ -39,7 +47,7 @@ func RunWithContext(tk *task.Task, startStep int, timeout time.Duration, prior m
 	for name, sr := range prior {
 		completed[name] = sr
 		templateData[name] = map[string]any{
-			"output": sr.Output,
+			"output": sr.EffectiveOutput(),
 		}
 	}
 
@@ -85,7 +93,7 @@ func RunWithContext(tk *task.Task, startStep int, timeout time.Duration, prior m
 
 		// Update template data for subsequent steps
 		templateData[step.Name] = map[string]any{
-			"output": output,
+			"output": completed[step.Name].EffectiveOutput(),
 		}
 	}
 

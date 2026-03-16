@@ -45,6 +45,12 @@ func NewServer(q *queue.Queue, tasksDir string, logger *log.Logger) *Server {
 			}
 			return id
 		},
+		"effectiveOutput": func(sr pipeline.StepResult) string {
+			return sr.EffectiveOutput()
+		},
+		"hasOverride": func(sr pipeline.StepResult) bool {
+			return sr.OutputOverride != ""
+		},
 	}
 
 	// Parse shared templates (layout + partials) as a base, then clone per page
@@ -82,6 +88,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /queue/{id}/approve", s.handleApprove)
 	mux.HandleFunc("POST /queue/{id}/reject", s.handleReject)
 	mux.HandleFunc("POST /queue/{id}/rerun", s.handleRerun)
+	mux.HandleFunc("POST /queue/{id}/steps/{step}/output", s.handleStepOutputUpdate)
 	mux.HandleFunc("POST /queue/clear", s.handleClear)
 	mux.HandleFunc("POST /queue/clear-all", s.handleClearAll)
 	mux.HandleFunc("GET /tasks", s.handleTaskList)

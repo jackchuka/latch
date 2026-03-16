@@ -323,6 +323,38 @@ func (s *Server) handleTaskSave(w http.ResponseWriter, r *http.Request) {
 	s.redirect(w, r, fmt.Sprintf("/tasks/%s?flash=Saved", name))
 }
 
+func (s *Server) handleStepOutputUpdate(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	stepName := r.PathValue("step")
+
+	item, err := s.queue.Load(id)
+	if err != nil {
+		s.redirect(w, r, "/?error=Item+not+found")
+		return
+	}
+
+	if item.Status == queue.StatusRunning {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape("Cannot edit output while item is running")))
+		return
+	}
+
+	sr, ok := item.StepsCompleted[stepName]
+	if !ok {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape("Step not found: "+stepName)))
+		return
+	}
+
+	sr.OutputOverride = r.FormValue("output_override")
+	item.StepsCompleted[stepName] = sr
+
+	if err := s.queue.Save(item); err != nil {
+		s.redirect(w, r, fmt.Sprintf("/queue/%s?error=%s", id, url.QueryEscape(err.Error())))
+		return
+	}
+
+	s.redirect(w, r, fmt.Sprintf("/queue/%s?flash=Output+updated", id))
+}
+
 // sortItems orders items: pending first, then running, then by created descending.
 func sortItems(items []*queue.Item) {
 	statusOrder := map[string]int{
