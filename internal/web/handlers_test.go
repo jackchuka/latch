@@ -396,6 +396,156 @@ func TestHandleRerunHtmx(t *testing.T) {
 	}
 }
 
+func TestHandleStepOutputUpdate(t *testing.T) {
+	srv, q := newTestServer(t)
+	item := &queue.Item{
+		ID:      "out-1",
+		Task:    "deploy",
+		Created: time.Now(),
+		Status:  queue.StatusDone,
+		StepsCompleted: map[string]pipeline.StepResult{
+			"build": {Output: "original output", Duration: "1.2s"},
+		},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/queue/out-1/steps/build/output",
+		strings.NewReader("output_override=cleaned+output"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+
+	updated, _ := q.Load("out-1")
+	sr := updated.StepsCompleted["build"]
+	if sr.Output != "original output" {
+		t.Errorf("original output changed: got %q", sr.Output)
+	}
+	if sr.OutputOverride != "cleaned output" {
+		t.Errorf("override: got %q, want %q", sr.OutputOverride, "cleaned output")
+	}
+}
+
+func TestHandleStepOutputUpdateRestore(t *testing.T) {
+	srv, q := newTestServer(t)
+	item := &queue.Item{
+		ID:      "out-2",
+		Task:    "deploy",
+		Created: time.Now(),
+		Status:  queue.StatusDone,
+		StepsCompleted: map[string]pipeline.StepResult{
+			"build": {Output: "original", Duration: "1s", OutputOverride: "old override"},
+		},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/queue/out-2/steps/build/output",
+		strings.NewReader("output_override="))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+
+	updated, _ := q.Load("out-2")
+	if updated.StepsCompleted["build"].OutputOverride != "" {
+		t.Errorf("override should be cleared, got %q", updated.StepsCompleted["build"].OutputOverride)
+	}
+}
+
+func TestHandleStepOutputUpdateRunningItem(t *testing.T) {
+	srv, q := newTestServer(t)
+	item := &queue.Item{
+		ID:      "out-run",
+		Task:    "deploy",
+		Created: time.Now(),
+		Status:  queue.StatusRunning,
+		StepsCompleted: map[string]pipeline.StepResult{
+			"build": {Output: "ok", Duration: "1s"},
+		},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/queue/out-run/steps/build/output",
+		strings.NewReader("output_override=changed"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	loc := rec.Header().Get("Location")
+	if !containsString(loc, "error") {
+		t.Errorf("expected error redirect for running item, got %q", loc)
+	}
+
+	updated, _ := q.Load("out-run")
+	if updated.StepsCompleted["build"].OutputOverride != "" {
+		t.Error("override should not be set on running item")
+	}
+}
+
+func TestHandleStepOutputUpdateHtmx(t *testing.T) {
+	srv, q := newTestServer(t)
+	item := &queue.Item{
+		ID:      "out-hx",
+		Task:    "deploy",
+		Created: time.Now(),
+		Status:  queue.StatusDone,
+		StepsCompleted: map[string]pipeline.StepResult{
+			"build": {Output: "original", Duration: "1s"},
+		},
+	}
+	if err := q.Save(item); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/queue/out-hx/steps/build/output",
+		strings.NewReader("output_override=cleaned"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if loc := rec.Header().Get("HX-Redirect"); loc == "" {
+		t.Error("expected HX-Redirect header for htmx request")
+	}
+}
+
+func TestHandleStepOutputUpdateNotFound(t *testing.T) {
+	srv, q := newTestServer(t)
+	seedItem(t, q, "out-3", "deploy", queue.StatusDone)
+
+	req := httptest.NewRequest("POST", "/queue/out-3/steps/nonexistent/output",
+		strings.NewReader("output_override=foo"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status: got %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	loc := rec.Header().Get("Location")
+	if !containsString(loc, "error") {
+		t.Errorf("expected error redirect for nonexistent step, got %q", loc)
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && indexOf(s, substr) >= 0
 }

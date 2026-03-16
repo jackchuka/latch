@@ -70,12 +70,45 @@
       {{- end}}
     </tr>
     {{- if hasStep $.Item.StepsCompleted $step.Name}}
-    {{- if $result.Output}}
+    {{- $result := index $.Item.StepsCompleted $step.Name}}
+    {{- if or $result.Output $result.OutputOverride}}
     <tr>
       <td colspan="4" style="padding: 0; border-bottom: 1px solid var(--border);">
         <details class="step-output">
-          <summary>Show output</summary>
-          <pre>{{$result.Output}}</pre>
+          <summary>
+            Show output
+            {{- if hasOverride $result}} <span class="badge badge-pending" style="font-size: 0.7rem;">overridden</span>{{end}}
+          </summary>
+          <div style="padding: 0.5rem 0.75rem;">
+            <pre>{{effectiveOutput $result}}</pre>
+
+            {{- if hasOverride $result}}
+            <details style="margin-top: 0.5rem;">
+              <summary style="font-size: 0.85rem; color: var(--text-muted); cursor: pointer;">View original output</summary>
+              <pre style="margin-top: 0.25rem; opacity: 0.7;">{{$result.Output}}</pre>
+            </details>
+            {{- end}}
+
+            <div style="margin-top: 0.5rem;">
+              <button class="btn btn-outline btn-sm" type="button" data-step="{{$step.Name}}" onclick="toggleEditOutput(this.dataset.step)">Edit output</button>
+              {{- if hasOverride $result}}
+              <form method="POST" action="/queue/{{$.Item.ID}}/steps/{{$step.Name}}/output" style="display:inline;">
+                <input type="hidden" name="output_override" value="">
+                <button class="btn btn-outline btn-sm" type="submit">Restore original</button>
+              </form>
+              {{- end}}
+            </div>
+
+            <form method="POST" action="/queue/{{$.Item.ID}}/steps/{{$step.Name}}/output"
+                  id="edit-form-{{$step.Name}}" style="display:none; margin-top: 0.5rem;">
+              <textarea name="output_override" rows="6"
+                        style="width:100%; font-family:monospace; font-size:0.85rem; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:0.5rem;">{{effectiveOutput $result}}</textarea>
+              <div style="margin-top: 0.25rem;">
+                <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                <button class="btn btn-outline btn-sm" type="button" data-step="{{$step.Name}}" onclick="toggleEditOutput(this.dataset.step)">Cancel</button>
+              </div>
+            </form>
+          </div>
         </details>
       </td>
     </tr>
@@ -96,9 +129,17 @@
 <h3 style="margin-bottom: 0.5rem;">Step Outputs</h3>
 {{- range $name, $result := .Item.StepsCompleted}}
 <details class="step-output">
-  <summary>{{$name}} <span style="font-weight:normal; color: var(--text-muted);">({{$result.Duration}})</span></summary>
-  <pre>{{$result.Output}}</pre>
+  <summary>{{$name}} <span style="font-weight:normal; color: var(--text-muted);">({{$result.Duration}})</span>
+    {{- if hasOverride $result}} <span class="badge badge-pending" style="font-size: 0.7rem;">overridden</span>{{end}}
+  </summary>
+  <pre>{{effectiveOutput $result}}</pre>
 </details>
 {{- end}}
 {{- end}}
+<script>
+function toggleEditOutput(stepName) {
+  var form = document.getElementById('edit-form-' + stepName);
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 {{end}}

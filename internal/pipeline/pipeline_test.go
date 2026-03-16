@@ -154,6 +154,64 @@ func TestTemplateSubstitution(t *testing.T) {
 	}
 }
 
+func TestTemplateSubstitutionUsesOverride(t *testing.T) {
+	tk := &task.Task{
+		Name: "override-test",
+		Steps: []task.Step{
+			{Name: "step1", Command: "echo", Args: []string{"hello"}},
+			{Name: "step2", Command: "echo", Args: []string{"got: {{.step1.output}}"}, Approve: true},
+		},
+	}
+
+	prior := map[string]StepResult{
+		"step1": {Output: "hello", Duration: "1ms", OutputOverride: "cleaned-value"},
+	}
+
+	result, err := RunWithContext(tk, 1, 0, prior)
+	if err != nil {
+		t.Fatalf("RunWithContext: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Errorf("Status: got %q, want %q", result.Status, StatusCompleted)
+	}
+	out := result.StepsCompleted["step2"].Output
+	if out != "got: cleaned-value" {
+		t.Errorf("step2 output: got %q, want %q", out, "got: cleaned-value")
+	}
+}
+
+func TestEffectiveOutput(t *testing.T) {
+	tests := []struct {
+		name   string
+		result StepResult
+		want   string
+	}{
+		{
+			name:   "no override returns output",
+			result: StepResult{Output: "original", Duration: "1s"},
+			want:   "original",
+		},
+		{
+			name:   "override takes precedence",
+			result: StepResult{Output: "original", Duration: "1s", OutputOverride: "cleaned"},
+			want:   "cleaned",
+		},
+		{
+			name:   "empty override returns output",
+			result: StepResult{Output: "original", Duration: "1s", OutputOverride: ""},
+			want:   "original",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.result.EffectiveOutput(); got != tt.want {
+				t.Errorf("EffectiveOutput() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRunErrors(t *testing.T) {
 	tests := []struct {
 		name    string
