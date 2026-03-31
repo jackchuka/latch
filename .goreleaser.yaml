@@ -24,8 +24,7 @@ builds:
       - -X github.com/jackchuka/latch/internal/version.BuildDate={{.Date}}
     hooks:
       post:
-        - cmd: >-
-            {{ if eq .Os "darwin" }}codesign -s - -i com.latch.cli -f {{ .Path }}{{ else }}true{{ end }}
+        - cmd: sh -c '{{ if eq .Os "darwin" }}command -v codesign >/dev/null 2>&1 && codesign -s - -i com.latch.cli -f "{{ .Path }}" || true{{ else }}true{{ end }}'
           output: true
 
 changelog:
