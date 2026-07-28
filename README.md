@@ -1,5 +1,9 @@
 # latch
 
+[![Test](https://github.com/jackchuka/latch/actions/workflows/test.yml/badge.svg)](https://github.com/jackchuka/latch/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/jackchuka/latch?sort=semver)](https://github.com/jackchuka/latch/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Task runner with approval gates. Define multi-step command pipelines, gate irreversible actions behind human approval, and optionally schedule them with cron.
 
 Agent-agnostic — runs any command, not just AI agents. No daemon to maintain.
