@@ -1,6 +1,16 @@
 version: "2"
 linters:
   default: standard
+  exclusions:
+    rules:
+      # scheduler.New() is build-tag dependent: the !darwin implementation
+      # always returns an error, so when staticcheck analyses the tree under
+      # GOOS=linux (as CI does) it proves the callers' err checks are constant
+      # and reports SA4023. Those checks are correct and must stay - on darwin
+      # New() can fail for real, via os.UserHomeDir().
+      - linters:
+          - staticcheck
+        text: "^SA4023"
 
 formatters:
   enable:
