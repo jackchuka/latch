@@ -8,7 +8,7 @@
   <td><a href="/tasks/{{.Task}}">{{.Task}}</a></td>
   <td><span class="badge badge-{{statusClass .Status}}">{{.Status}}</span></td>
   <td title="{{formatTime .Created}}">{{relativeTime .Created}}</td>
-  <td>{{.PausedAtStep}}</td>
+  <td>{{.StepLabel nil}}</td>
   <td>
     {{- if eq .Status "pending"}}
     <form method="POST" action="/queue/{{.ID}}/approve" style="display:inline;">

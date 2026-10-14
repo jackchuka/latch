@@ -39,7 +39,7 @@ Parse from the user's invocation message:
 ### Phase 2: Fetch Pending Items
 
 1. Run `latch queue list` to list all pending items.
-2. Parse the output table. Each row has: ID, TASK, CREATED, PAUSED AT.
+2. Parse the output table. Each row has: ID, TASK, STATUS, CREATED, STEP (the step it paused at, by name and position).
 3. If no pending items, report: "All clear — nothing pending." and stop.
 
 ### Phase 3: Fetch Details for Each Item
@@ -47,8 +47,8 @@ Parse from the user's invocation message:
 For each pending item, run `latch queue show <id>` to get:
 - Task name
 - Created timestamp
-- Paused at step number
-- Completed step outputs (the `--- step: <name> ---` sections)
+- The step it paused at (`Paused At Step: <name> (<n> of <total>)`)
+- Completed step outputs in pipeline order (the `--- step: <name> ---` sections)
 
 Run these in parallel where possible.
 
@@ -60,7 +60,7 @@ Present all pending items in a numbered table with their step outputs:
 ## Pending Items
 
 ### 1. daily-standup (20260228-093045-daily-standup)
-Created: 2026-02-28 09:30 | Paused at step: 2
+Created: 2026-02-28 09:30 | Paused at step: post (3 of 3)
 
 **Step: gather**
 > [output from the gather step, first 200 chars if over 500]
@@ -71,7 +71,7 @@ Created: 2026-02-28 09:30 | Paused at step: 2
 ---
 
 ### 2. weekly-report (20260228-100000-weekly-report)
-Created: 2026-02-28 10:00 | Paused at step: 1
+Created: 2026-02-28 10:00 | Paused at step: send (2 of 2)
 
 **Step: collect**
 > [output]

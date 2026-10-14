@@ -10,7 +10,7 @@ import (
 
 var clearCmd = &cobra.Command{
 	Use:   "clear",
-	Short: "Clear finished queue items",
+	Short: "Clear done, failed, and rejected queue items",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		p, err := paths.New()
 		if err != nil {
@@ -34,7 +34,7 @@ var clearCmd = &cobra.Command{
 			return nil
 		}
 
-		n, err := q.DeleteByStatus(queue.StatusDone, queue.StatusRejected)
+		n, err := q.DeleteFinished()
 		if err != nil {
 			return fmt.Errorf("clear queue: %w", err)
 		}

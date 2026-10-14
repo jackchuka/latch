@@ -9,11 +9,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jackchuka/latch/internal/pipeline"
+	"github.com/jackchuka/latch/internal/task"
 )
 
 const (
@@ -23,6 +25,9 @@ const (
 	StatusFailed   = "failed"
 	StatusRejected = "rejected"
 )
+
+// Statuses lists every item status in lifecycle order.
+var Statuses = []string{StatusPending, StatusRunning, StatusDone, StatusFailed, StatusRejected}
 
 type Item struct {
 	ID             string                         `json:"id"`
@@ -74,6 +79,44 @@ func (item *Item) MergeSteps(steps map[string]pipeline.StepResult) {
 	}
 }
 
+// StepNames returns the names of completed steps in pipeline order. Steps not
+// in tk (all of them when tk is nil) follow in alphabetical order.
+func (item *Item) StepNames(tk *task.Task) []string {
+	names := make([]string, 0, len(item.StepsCompleted))
+	if tk != nil {
+		for _, s := range tk.Steps {
+			if _, ok := item.StepsCompleted[s.Name]; ok {
+				names = append(names, s.Name)
+			}
+		}
+	}
+	var rest []string
+	for name := range item.StepsCompleted {
+		if !slices.Contains(names, name) {
+			rest = append(rest, name)
+		}
+	}
+	slices.Sort(rest)
+	return append(names, rest...)
+}
+
+// StepLabel describes the step the item stopped at by name and 1-based
+// position, e.g. "publish (3 of 3)". It returns "-" for completed items.
+// tk may be nil when the task definition is no longer available.
+func (item *Item) StepLabel(tk *task.Task) string {
+	i := item.PausedAtStep
+	if item.Status == StatusDone {
+		return "-"
+	}
+	if tk == nil {
+		return fmt.Sprintf("step %d", i+1)
+	}
+	if i < 0 || i >= len(tk.Steps) {
+		return "-"
+	}
+	return fmt.Sprintf("%s (%d of %d)", tk.Steps[i].Name, i+1, len(tk.Steps))
+}
+
 type Queue struct {
 	dir string
 }
@@ -112,6 +155,12 @@ func (q *Queue) Load(id string) (*Item, error) {
 }
 
 func (q *Queue) ListPending() ([]*Item, error) {
+	return q.List(StatusPending)
+}
+
+// List returns items with any of the given statuses, or all items when none
+// are given. Stale running items are marked failed first.
+func (q *Queue) List(statuses ...string) ([]*Item, error) {
 	if err := q.RecoverStale(); err != nil {
 		return nil, err
 	}
@@ -120,14 +169,17 @@ func (q *Queue) ListPending() ([]*Item, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(statuses) == 0 {
+		return all, nil
+	}
 
-	var pending []*Item
+	var matched []*Item
 	for _, item := range all {
-		if item.Status == StatusPending {
-			pending = append(pending, item)
+		if slices.Contains(statuses, item.Status) {
+			matched = append(matched, item)
 		}
 	}
-	return pending, nil
+	return matched, nil
 }
 
 // RecoverStale marks running items whose PID is no longer alive as failed.
@@ -189,6 +241,12 @@ func (q *Queue) DeleteByStatus(statuses ...string) (int, error) {
 		}
 	}
 	return deleted, nil
+}
+
+// DeleteFinished removes items that will not run again without user action:
+// done, failed, and rejected.
+func (q *Queue) DeleteFinished() (int, error) {
+	return q.DeleteByStatus(StatusDone, StatusFailed, StatusRejected)
 }
 
 func (q *Queue) DeleteByTask(taskName string) (int, error) {

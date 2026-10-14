@@ -116,9 +116,20 @@ func cronToCalendarIntervals(cron string) ([]CalendarInterval, error) {
 		return nil, fmt.Errorf("parsing month field: %w", err)
 	}
 
-	weekdays, err := expandCronField(weekdayField, 0, 6)
+	weekdays, err := expandCronField(weekdayField, 0, 7)
 	if err != nil {
 		return nil, fmt.Errorf("parsing weekday field: %w", err)
+	}
+	weekdays = normalizeSunday(weekdays)
+	if strings.HasPrefix(weekdayField, "*") && len(weekdays) == 7 {
+		weekdays = nil
+	}
+
+	// cron ANDs the day fields when either starts with "*", but launchd ORs
+	// Day and Weekday, so a starred step cannot be paired with the other field.
+	if days != nil && weekdays != nil &&
+		(strings.HasPrefix(dayField, "*") || strings.HasPrefix(weekdayField, "*")) {
+		return nil, fmt.Errorf("day %q and weekday %q cannot be combined: cron requires both to match, but launchd runs on either", dayField, weekdayField)
 	}
 
 	// Build the Cartesian product of all expanded field values.
@@ -156,7 +167,8 @@ func cronToCalendarIntervals(cron string) ([]CalendarInterval, error) {
 }
 
 // expandCronField parses a single cron field and returns the expanded list of
-// integer values, or nil if the field is "*" (meaning "any").
+// integer values, or nil if the field matches every value (e.g. "*" or "*/1").
+// It accepts "*", "*/N", "a", "a-b", "a-b/N", and comma-separated lists of these.
 // All values must be within [min, max].
 func expandCronField(field string, min, max int) ([]int, error) {
 	if field == "*" {
@@ -164,38 +176,83 @@ func expandCronField(field string, min, max int) ([]int, error) {
 	}
 
 	var result []int
+	seen := make(map[int]bool)
 
-	parts := strings.Split(field, ",")
-	for _, part := range parts {
-		if strings.Contains(part, "-") {
-			bounds := strings.SplitN(part, "-", 2)
-			lo, err := strconv.Atoi(bounds[0])
+	for _, part := range strings.Split(field, ",") {
+		rangePart, stepPart, hasStep := strings.Cut(part, "/")
+		step := 1
+		if hasStep {
+			n, err := strconv.Atoi(stepPart)
+			if err != nil || n < 1 {
+				return nil, fmt.Errorf("invalid step %q", stepPart)
+			}
+			step = n
+		}
+
+		var lo, hi int
+		switch {
+		case rangePart == "*":
+			lo, hi = min, max
+		case strings.Contains(rangePart, "-"):
+			bounds := strings.SplitN(rangePart, "-", 2)
+			var err error
+			lo, err = strconv.Atoi(bounds[0])
 			if err != nil {
 				return nil, fmt.Errorf("invalid range start %q: %w", bounds[0], err)
 			}
-			hi, err := strconv.Atoi(bounds[1])
+			hi, err = strconv.Atoi(bounds[1])
 			if err != nil {
 				return nil, fmt.Errorf("invalid range end %q: %w", bounds[1], err)
 			}
 			if lo < min || hi > max {
 				return nil, fmt.Errorf("value out of range [%d-%d]: %s", min, max, part)
 			}
-			for i := lo; i <= hi; i++ {
-				result = append(result, i)
+			if lo > hi {
+				return nil, fmt.Errorf("invalid range %q: start is after end", rangePart)
 			}
-		} else {
-			val, err := strconv.Atoi(part)
+		default:
+			if hasStep {
+				return nil, fmt.Errorf("invalid step %q: use a range or * before /", part)
+			}
+			val, err := strconv.Atoi(rangePart)
 			if err != nil {
-				return nil, fmt.Errorf("invalid value %q: %w", part, err)
+				return nil, fmt.Errorf("invalid value %q: %w", rangePart, err)
 			}
 			if val < min || val > max {
 				return nil, fmt.Errorf("value out of range [%d-%d]: %d", min, max, val)
 			}
-			result = append(result, val)
+			lo, hi = val, val
+		}
+
+		for v := lo; v <= hi; v += step {
+			if !seen[v] {
+				seen[v] = true
+				result = append(result, v)
+			}
 		}
 	}
 
+	if strings.HasPrefix(field, "*") && len(result) == max-min+1 {
+		return nil, nil
+	}
 	return result, nil
+}
+
+// normalizeSunday maps weekday 7 to 0 (both mean Sunday) and drops duplicates.
+func normalizeSunday(weekdays []int) []int {
+	if weekdays == nil {
+		return nil
+	}
+	var result []int
+	seen := make(map[int]bool)
+	for _, d := range weekdays {
+		d %= 7
+		if !seen[d] {
+			seen[d] = true
+			result = append(result, d)
+		}
+	}
+	return result
 }
 
 // GeneratePlist renders a launchd plist XML string for the given task.

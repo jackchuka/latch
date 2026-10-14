@@ -3,11 +3,11 @@ package queuecmd
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/jackchuka/latch/internal/output"
 	"github.com/jackchuka/latch/internal/paths"
 	"github.com/jackchuka/latch/internal/queue"
+	"github.com/jackchuka/latch/internal/task"
 	"github.com/spf13/cobra"
 )
 
@@ -35,14 +35,17 @@ var showCmd = &cobra.Command{
 		fmt.Printf("Task:           %s\n", item.Task)
 		fmt.Printf("Created:        %s\n", item.Created.Format("2006-01-02 15:04"))
 		fmt.Printf("Status:         %s\n", item.Status)
-		fmt.Printf("Paused At Step: %d\n", item.PausedAtStep)
 
-		names := make([]string, 0, len(item.StepsCompleted))
-		for name := range item.StepsCompleted {
-			names = append(names, name)
+		tk, _ := task.Load(p.TaskFile(item.Task))
+		switch item.Status {
+		case queue.StatusDone:
+		case queue.StatusFailed:
+			fmt.Printf("Failed At Step: %s\n", item.StepLabel(tk))
+		default:
+			fmt.Printf("Paused At Step: %s\n", item.StepLabel(tk))
 		}
-		slices.Sort(names)
-		for _, name := range names {
+
+		for _, name := range item.StepNames(tk) {
 			fmt.Printf("\n--- step: %s ---\n", name)
 			fmt.Println(item.StepsCompleted[name].Output)
 		}
