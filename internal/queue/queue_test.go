@@ -358,3 +358,68 @@ func TestMergeStepsNilMap(t *testing.T) {
 		t.Error("expected build step on nil map")
 	}
 }
+
+func TestList(t *testing.T) {
+	q := New(t.TempDir())
+	for _, item := range []*Item{
+		{ID: "a", Task: "t", Status: StatusPending},
+		{ID: "b", Task: "t", Status: StatusFailed},
+		{ID: "c", Task: "t", Status: StatusRejected},
+		{ID: "d", Task: "t", Status: StatusFailed},
+	} {
+		if err := q.Save(item); err != nil {
+			t.Fatalf("Save %s: %v", item.ID, err)
+		}
+	}
+
+	ids := func(items []*Item) string {
+		var s []string
+		for _, it := range items {
+			s = append(s, it.ID)
+		}
+		return strings.Join(s, ",")
+	}
+
+	failed, err := q.List(StatusFailed)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if got := ids(failed); got != "b,d" {
+		t.Errorf("List(failed) = %s, want b,d", got)
+	}
+
+	all, err := q.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if got := ids(all); got != "a,b,c,d" {
+		t.Errorf("List() = %s, want a,b,c,d", got)
+	}
+}
+
+func TestDeleteFinished(t *testing.T) {
+	q := New(t.TempDir())
+	for _, item := range []*Item{
+		{ID: "a", Task: "t", Status: StatusPending},
+		{ID: "b", Task: "t", Status: StatusRunning},
+		{ID: "c", Task: "t", Status: StatusDone},
+		{ID: "d", Task: "t", Status: StatusFailed},
+		{ID: "e", Task: "t", Status: StatusRejected},
+	} {
+		if err := q.Save(item); err != nil {
+			t.Fatalf("Save %s: %v", item.ID, err)
+		}
+	}
+
+	n, err := q.DeleteFinished()
+	if err != nil {
+		t.Fatalf("DeleteFinished: %v", err)
+	}
+	if n != 3 {
+		t.Errorf("DeleteFinished deleted %d, want 3", n)
+	}
+	all, _ := q.ListAll()
+	if len(all) != 2 || all[0].ID != "a" || all[1].ID != "b" {
+		t.Errorf("remaining items = %v, want pending and running only", all)
+	}
+}

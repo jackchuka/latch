@@ -143,7 +143,7 @@ func (s *Server) handleRerun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClear(w http.ResponseWriter, r *http.Request) {
-	n, err := s.queue.DeleteByStatus(queue.StatusDone, queue.StatusRejected)
+	n, err := s.queue.DeleteFinished()
 	if err != nil {
 		s.redirect(w, r, "/?error="+err.Error())
 		return

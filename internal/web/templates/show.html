@@ -8,7 +8,7 @@
     <dt>Task</dt><dd><a href="/tasks/{{.Item.Task}}">{{.Item.Task}}</a></dd>
     <dt>Status</dt><dd><span class="badge badge-{{statusClass .Item.Status}}">{{.Item.Status}}</span></dd>
     <dt>Created</dt><dd>{{formatTime .Item.Created}}</dd>
-    <dt>Paused Step</dt><dd>{{.Item.PausedAtStep}}</dd>
+    <dt>Step</dt><dd>{{.Item.StepLabel .Task}}</dd>
     {{- if .Item.Error}}
     <dt>Error</dt><dd style="color: var(--danger);">{{.Item.Error}}</dd>
     {{- end}}

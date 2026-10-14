@@ -28,6 +28,7 @@ func TestGeneratePlist(t *testing.T) {
 func TestInstallAndUninstall(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(dir)
+	m.runCmd = func(string, ...string) error { return nil }
 
 	if err := m.Install("test-task", "0 9 * * *"); err != nil {
 		t.Fatalf("Install returned error: %v", err)
@@ -297,12 +298,12 @@ func TestCronToCalendarIntervalErrors(t *testing.T) {
 		},
 		{
 			name:    "weekday out of range",
-			cron:    "0 9 * * 7",
+			cron:    "0 9 * * 8",
 			wantErr: "value out of range",
 		},
 		{
 			name:    "range exceeds bounds",
-			cron:    "0 9 * * 0-7",
+			cron:    "0 9 * * 0-8",
 			wantErr: "value out of range",
 		},
 	}
@@ -312,6 +313,90 @@ func TestCronToCalendarIntervalErrors(t *testing.T) {
 			_, err := cronToCalendarIntervals(tt.cron)
 			if err == nil {
 				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q does not contain %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCronToCalendarIntervalStandardSyntax(t *testing.T) {
+	type slot struct{ minute, hour, day, month, weekday int } // -1 = unset
+	toSlots := func(intervals []CalendarInterval) []slot {
+		out := make([]slot, len(intervals))
+		for i, ci := range intervals {
+			s := slot{-1, -1, -1, -1, -1}
+			if ci.Minute {
+				s.minute = ci.MinuteVal
+			}
+			if ci.Hour {
+				s.hour = ci.HourVal
+			}
+			if ci.Day {
+				s.day = ci.DayVal
+			}
+			if ci.Month {
+				s.month = ci.MonthVal
+			}
+			if ci.Weekday {
+				s.weekday = ci.WeekdayVal
+			}
+			out[i] = s
+		}
+		return out
+	}
+
+	tests := []struct {
+		cron string
+		want []slot
+	}{
+		{"*/15 * * * *", []slot{{0, -1, -1, -1, -1}, {15, -1, -1, -1, -1}, {30, -1, -1, -1, -1}, {45, -1, -1, -1, -1}}},
+		{"0 */8 * * *", []slot{{0, 0, -1, -1, -1}, {0, 8, -1, -1, -1}, {0, 16, -1, -1, -1}}},
+		{"0 9 1-10/4 * *", []slot{{0, 9, 1, -1, -1}, {0, 9, 5, -1, -1}, {0, 9, 9, -1, -1}}},
+		{"0 0 1 */5 *", []slot{{0, 0, 1, 1, -1}, {0, 0, 1, 6, -1}, {0, 0, 1, 11, -1}}},
+		{"0 9 * * 7", []slot{{0, 9, -1, -1, 0}}},
+		{"0 9 * * 0,7", []slot{{0, 9, -1, -1, 0}}},
+		{"0 9 * * 5-7", []slot{{0, 9, -1, -1, 5}, {0, 9, -1, -1, 6}, {0, 9, -1, -1, 0}}},
+		{"0 9 * * */3", []slot{{0, 9, -1, -1, 0}, {0, 9, -1, -1, 3}, {0, 9, -1, -1, 6}}},
+		{"0 9 * * 1-5/2", []slot{{0, 9, -1, -1, 1}, {0, 9, -1, -1, 3}, {0, 9, -1, -1, 5}}},
+		{"*/1 9 * * *", []slot{{-1, 9, -1, -1, -1}}},
+		{"0 9 */1 * 1", []slot{{0, 9, -1, -1, 1}}},
+		{"0,30 9 * * 1,3-4", []slot{{0, 9, -1, -1, 1}, {0, 9, -1, -1, 3}, {0, 9, -1, -1, 4}, {30, 9, -1, -1, 1}, {30, 9, -1, -1, 3}, {30, 9, -1, -1, 4}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.cron, func(t *testing.T) {
+			intervals, err := cronToCalendarIntervals(tt.cron)
+			if err != nil {
+				t.Fatalf("cronToCalendarIntervals(%q) returned error: %v", tt.cron, err)
+			}
+			got := toSlots(intervals)
+			if fmt.Sprint(got) != fmt.Sprint(tt.want) {
+				t.Errorf("cronToCalendarIntervals(%q)\n got  %v\n want %v", tt.cron, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCronToCalendarIntervalStandardSyntaxErrors(t *testing.T) {
+	tests := []struct {
+		cron    string
+		wantErr string
+	}{
+		{"*/0 * * * *", "invalid step"},
+		{"*/x * * * *", "invalid step"},
+		{"0 9 * * 8", "value out of range"},
+		{"0 9 * * 5-1", "invalid range"},
+		// cron ANDs a starred day field with a restricted one, which launchd cannot express
+		{"0 9 */2 * 1", "cannot be combined"},
+		{"0 9 1 * */2", "cannot be combined"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.cron, func(t *testing.T) {
+			_, err := cronToCalendarIntervals(tt.cron)
+			if err == nil {
+				t.Fatalf("cronToCalendarIntervals(%q) returned nil error", tt.cron)
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error %q does not contain %q", err, tt.wantErr)
