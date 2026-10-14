@@ -1,0 +1,15 @@
+name: release
+
+steps:
+  - name: test
+    command: bash
+    args: ["-c", "echo 'ok  example.com/app  0.42s'"]
+
+  - name: build
+    command: bash
+    args: ["-c", "echo dist/app-v1.4.0.tar.gz"]
+
+  - name: publish
+    command: bash
+    args: ["-c", "echo 'uploaded {{.build.output}}'"]
+    approve: true

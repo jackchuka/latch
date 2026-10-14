@@ -142,15 +142,17 @@ rm "$TMPFILE"
 | Error | Action |
 |-------|--------|
 | `latch` not in PATH | Tell user to install, stop |
-| Invalid cron expression | `latch add` will reject it — show the error, ask user to fix |
+| Invalid cron expression | `latch task add` will reject it — show the error, ask user to fix |
 | Task name already exists | `latch task add` overwrites — warn user before proceeding |
 | YAML write fails | Show error, output the YAML so user can save manually |
 
 ## Tips
 
 - Cron format: `minute hour day month weekday` (5 fields, no seconds)
-- Weekdays: 0=Sunday, 1=Monday, ..., 6=Saturday
+- Weekdays: 0=Sunday, 1=Monday, ..., 6=Saturday; 7 is also Sunday
 - Use `*` for "every" — e.g., `0 * * * *` = every hour at minute 0
+- Steps (`*/N`, `a-b/N`), ranges (`a-b`), and lists (`a,b`) are supported — e.g., `*/15 * * * *` = every 15 minutes
+- Avoid pairing a `*/N` day of month with a specific weekday (or the reverse); launchd cannot express it and `latch task add` reports an error
 - Steps run sequentially; each step's stdout is available to later steps via `{{.step-name.output}}`
 - `approve: true` pauses the pipeline *before* running that step and saves state to the queue for human review
 - Cron schedules use the system's local timezone
